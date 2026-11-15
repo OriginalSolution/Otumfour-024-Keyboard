@@ -50,7 +50,7 @@ data class ThemeColors(
     val micGlow: Int,
     val pressed: Int,
     val cornerDp: Float,
-    val spaceTitle: String = "O24 Keyboard",
+    val spaceTitle: String = "Otumfour",
     val stoneKeys: Boolean = false,
     val stoolOnSpace: Boolean = false,
     val crestRows: Boolean = false,

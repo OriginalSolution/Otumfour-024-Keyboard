@@ -30,7 +30,7 @@ class TryActivity : AppCompatActivity() {
             setPadding(pad, pad, pad, 0)
         }
         val field = EditText(this).apply {
-            hint = "Type with O24 Keyboard"
+            hint = "Type with Otumfour"
             setText(intent.getStringExtra("sentence") ?: "Akwaaba, Ghana")
             setTextColor(o24Color(O24Color.CREAM))
             textSize = 20f
@@ -45,7 +45,7 @@ class TryActivity : AppCompatActivity() {
         if (intent.getBooleanExtra("preview", false)) {
             val colors = colorsFor(theme)
             root.addView(TextView(this).apply {
-                text = "Akwaaba    Ghana    O24"
+                text = "Akwaaba    Ghana    024"
                 setTextColor(colors.suggestionText)
                 setBackgroundColor(colors.suggestionBg)
                 setPadding(pad(12), pad(10), pad(12), pad(10))

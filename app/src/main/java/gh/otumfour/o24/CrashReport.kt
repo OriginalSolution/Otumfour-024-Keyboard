@@ -8,7 +8,7 @@ object CrashReport {
     const val FILE_NAME = "o24-crash.txt"
 
     fun textOf(error: Throwable): String = buildString {
-        append("O24 Keyboard ")
+        append("Otumfour ")
         append(BuildConfig.VERSION_NAME)
         append(" (")
         append(BuildConfig.VERSION_CODE)

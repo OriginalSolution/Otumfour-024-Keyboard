@@ -10,6 +10,6 @@ class CrashReportTest {
         val text = CrashReport.textOf(error)
         assertTrue(text.contains("contentTopInsets too large"))
         assertTrue(text.contains("IllegalArgumentException"))
-        assertTrue(text.contains("O24 Keyboard"))
+        assertTrue(text.contains("Otumfour"))
     }
 }

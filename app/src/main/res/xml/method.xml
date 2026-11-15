@@ -1,9 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The implicit subtype is the one Samsung and Android use when the phone's
+  language does not match a listed locale. Without it, One UI keeps the
+  previous keyboard because this keyboard has no subtype for that language.
+-->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:isDefault="true"
     android:settingsActivity="gh.otumfour.o24.ui.MainActivity"
     android:supportsSwitchingToNextInputMethod="true">
     <subtype
+        android:icon="@drawable/ic_launcher"
+        android:imeSubtypeExtraValue="AsciiCapable,KeyboardDefault"
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true"
+        android:label="@string/subtype_label"
+        android:overridesImplicitlyEnabledSubtype="true" />
+    <subtype
+        android:icon="@drawable/ic_launcher"
+        android:imeSubtypeExtraValue="AsciiCapable"
         android:imeSubtypeLocale="en_GB"
         android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true"
+        android:label="@string/subtype_label" />
+    <subtype
+        android:icon="@drawable/ic_launcher"
+        android:imeSubtypeExtraValue="AsciiCapable"
+        android:imeSubtypeLocale="en_GH"
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true"
         android:label="@string/subtype_label" />
 </input-method>

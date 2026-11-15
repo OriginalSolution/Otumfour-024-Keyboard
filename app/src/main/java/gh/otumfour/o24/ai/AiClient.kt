@@ -13,7 +13,7 @@ sealed class AiResult {
 }
 
 /**
- * Built-in rewrite and translate go to the O24 proxy. The OpenAI key stays on that server.
+ * Built-in rewrite and translate go to the Otumfour proxy. The OpenAI key stays on that server.
  * A custom OpenAI-compatible endpoint is used only when endpoint, model, and key are all set.
  */
 class AiClient(private val settings: O24Settings) {
@@ -54,7 +54,7 @@ class AiClient(private val settings: O24Settings) {
         connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
         readResponse(connection, proxy = true)
     } catch (_: Exception) {
-        AiResult.Unavailable("Could not reach O24 AI. Check your connection.")
+        AiResult.Unavailable("Could not reach Otumfour. Check your connection.")
     }
 
     private fun chat(instruction: String, text: String): AiResult = try {
@@ -87,12 +87,12 @@ class AiClient(private val settings: O24Settings) {
             .orEmpty()
         if (code !in 200..299) {
             val detail = jsonStringField(body, "error").orEmpty()
-            val message = if (detail.isNotBlank()) detail else "O24 AI could not do that ($code)."
+            val message = if (detail.isNotBlank()) detail else "Otumfour could not do that ($code)."
             return AiResult.Unavailable(message)
         }
         val content = if (proxy) jsonStringField(body, "text") else extractContent(body)
         return if (content.isNullOrBlank()) {
-            AiResult.Unavailable("O24 AI returned an empty reply.")
+            AiResult.Unavailable("Otumfour returned an empty reply.")
         } else {
             AiResult.Ok(stripWrappingQuotes(content.trim()))
         }

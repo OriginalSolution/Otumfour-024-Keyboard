@@ -30,9 +30,9 @@ class BrandHeaderView @JvmOverloads constructor(
         val flagTop = height * 0.42f
         canvas.drawColor(Color.parseColor("#0C0A07"))
         title.textSize = height * 0.16f
-        canvas.drawText("OTUMFOUR", width / 2f, height * 0.22f, title)
+        canvas.drawText("Otumfour", width / 2f, height * 0.22f, title)
         line.textSize = height * 0.07f
-        canvas.drawText("O24 Keyboard", width / 2f, height * 0.34f, line)
+        canvas.drawText("024", width / 2f, height * 0.34f, line)
         canvas.save()
         canvas.translate(0f, flagTop)
         ThemeArt.drawFlag(canvas, width, (height - flagTop).toInt(), stoolAlpha = 230)

@@ -55,7 +55,7 @@ object KeyboardModel {
         language: KeyboardLanguage,
         shift: ShiftState,
         enterLabel: String,
-        spaceLabel: String = "O24 Keyboard",
+        spaceLabel: String = "Otumfour",
     ): List<List<KeySpec>> = when (page) {
         BoardPage.LETTERS -> letters(language, shift, enterLabel, spaceLabel)
         BoardPage.SYMBOLS -> symbols(enterLabel, spaceLabel)
