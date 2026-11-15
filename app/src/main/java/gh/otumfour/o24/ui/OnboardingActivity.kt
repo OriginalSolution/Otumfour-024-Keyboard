@@ -41,13 +41,14 @@ class OnboardingActivity : AppCompatActivity() {
     private val serviceClass = O24InputMethodService::class.java.name
     private val imeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) {
+            if (isFinishing || isDestroyed) return
             refreshIme()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
+        prepareEdgeToEdge()
         val store = SettingsStore(this)
         if (store.isOnboarded()) {
             openSettings()
@@ -86,16 +87,13 @@ class OnboardingActivity : AppCompatActivity() {
                 false,
                 imeObserver,
             )
-            contentResolver.registerContentObserver(
-                Settings.Secure.getUriFor(Settings.Secure.ENABLED_INPUT_METHODS),
-                false,
-                imeObserver,
-            )
         }
+        // enabled_input_methods is not readable for targetSdk 34+ and registering it can throw.
     }
 
     override fun onStop() {
         runCatching { contentResolver.unregisterContentObserver(imeObserver) }
+        pickerRequested = false
         super.onStop()
     }
 
@@ -106,15 +104,16 @@ class OnboardingActivity : AppCompatActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus) return
+        if (!hasFocus || isFinishing || isDestroyed) return
         refreshIme()
         if (pickerRequested) window.decorView.post { showPickerIfFocused() }
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
+        if (isFinishing || !::pager.isInitialized) return
         freezeAdvance = true
-        installUi(if (::pager.isInitialized) pager.currentItem else 0)
+        installUi(pager.currentItem)
         freezeAdvance = false
     }
 
@@ -208,6 +207,7 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun refreshIme() {
+        if (isFinishing || isDestroyed) return
         if (!::pager.isInitialized || !::primary.isInitialized) return
         bindChrome(pager.currentItem)
         maybeAdvance()
@@ -262,16 +262,18 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun keyboardEnabled(): Boolean {
-        val listed = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
-        if (ImeMatch.listContains(listed, packageName, serviceClass)) return true
         val imm = getSystemService(InputMethodManager::class.java) ?: return false
-        return imm.enabledInputMethodList.any { info ->
-            info.packageName == packageName || ImeMatch.isOurs(info.id, packageName, serviceClass)
-        }
+        return runCatching {
+            imm.enabledInputMethodList.any { info ->
+                info.packageName == packageName || ImeMatch.isOurs(info.id, packageName, serviceClass)
+            }
+        }.getOrDefault(false)
     }
 
     private fun keyboardSelected(): Boolean {
-        val id = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        val id = runCatching {
+            Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        }.getOrNull()
         return ImeMatch.isOurs(id, packageName, serviceClass)
     }
 
@@ -289,7 +291,10 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun showPickerIfFocused() {
-        if (!pickerRequested) return
+        if (!pickerRequested || isFinishing || isDestroyed) {
+            pickerRequested = false
+            return
+        }
         if (!hasWindowFocus()) return
         if (::pager.isInitialized && pager.currentItem != 2) {
             pickerRequested = false

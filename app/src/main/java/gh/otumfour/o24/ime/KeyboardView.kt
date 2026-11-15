@@ -1,6 +1,7 @@
 package gh.otumfour.o24.ime
 
 import android.content.Context
+import android.util.Log
 import android.graphics.Bitmap
 import android.media.AudioManager
 import android.graphics.Canvas
@@ -307,11 +308,15 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun ensureArt() {
         if (art != null || width == 0 || height == 0) return
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        ThemeArt.draw(canvas, theme, width, height)
-        art = bitmap
-        artCanvas = canvas
+        try {
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            ThemeArt.draw(canvas, theme, width, height)
+            art = bitmap
+            artCanvas = canvas
+        } catch (error: Throwable) {
+            Log.e("O24Keyboard", "Theme bitmap failed at ${width}x$height", error)
+        }
     }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density

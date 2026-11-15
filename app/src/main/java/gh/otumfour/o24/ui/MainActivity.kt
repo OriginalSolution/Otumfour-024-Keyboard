@@ -1,5 +1,7 @@
 package gh.otumfour.o24.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -26,6 +28,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.BuildConfig
+import gh.otumfour.o24.CrashReport
 import gh.otumfour.o24.R
 import gh.otumfour.o24.data.LearnedWords
 import gh.otumfour.o24.data.SettingsStore
@@ -48,8 +51,8 @@ class MainActivity : AppCompatActivity() {
     private var versionTaps = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
+        prepareEdgeToEdge()
         store = SettingsStore(this)
         val open = intent.getBooleanExtra(EXTRA_OPEN, false)
         val finished = OnboardingRouter.showSettings(store.isOnboarded()) ||
@@ -77,6 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
+        if (isFinishing || !::store.isInitialized) return
         freezeAdvance = true
         installUi(currentSection())
         freezeAdvance = false
@@ -631,6 +635,18 @@ fun aboutColumn(activity: AppCompatActivity, onVersion: () -> Unit): LinearLayou
             version.setPadding(0, dp(10), 0, 0)
             version.setOnClickListener { onVersion() }
             addView(version)
+            CrashReport.read(activity)?.let { report ->
+                addView(outlinePill(activity, activity.getString(R.string.crash_share)) {
+                    val clipboard = activity.getSystemService(ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("O24 crash", report))
+                    Toast.makeText(activity, R.string.crash_copied, Toast.LENGTH_SHORT).show()
+                    val send = Intent(Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(Intent.EXTRA_SUBJECT, activity.getString(R.string.crash_share_title))
+                        .putExtra(Intent.EXTRA_TEXT, report)
+                    activity.startActivity(Intent.createChooser(send, activity.getString(R.string.crash_share)))
+                })
+            }
         })
         addView(View(activity).apply { layoutParams = LinearLayout.LayoutParams(1, dp(10)) })
         addView(o24Card(activity) {

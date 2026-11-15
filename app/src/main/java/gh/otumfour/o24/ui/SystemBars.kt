@@ -1,5 +1,6 @@
 package gh.otumfour.o24.ui
 
+import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -15,16 +16,18 @@ fun ComponentActivity.prepareEdgeToEdge() {
 
 fun View.applySystemBarInsets() {
     ViewCompat.setOnApplyWindowInsetsListener(this) { view, windowInsets ->
-        val bars = windowInsets.getInsets(
-            WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
-        )
-        val ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
-        view.updatePadding(
-            left = bars.left,
-            top = bars.top,
-            right = bars.right,
-            bottom = max(bars.bottom, ime.bottom),
-        )
+        runCatching {
+            val bars = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            val ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
+            view.updatePadding(
+                left = bars.left,
+                top = bars.top,
+                right = bars.right,
+                bottom = max(bars.bottom, ime.bottom),
+            )
+        }.onFailure { Log.e("O24", "Applying system bar insets failed", it) }
         WindowInsetsCompat.CONSUMED
     }
     ViewCompat.requestApplyInsets(this)

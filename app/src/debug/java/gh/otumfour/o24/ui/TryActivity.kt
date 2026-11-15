@@ -19,8 +19,8 @@ import gh.otumfour.o24.ime.ShiftState
 /** Debug-only field used to photograph the keyboard. Not in the launcher. */
 class TryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
+        prepareEdgeToEdge()
         val theme = ThemeId.fromStorage(intent.getStringExtra("theme"))
         SettingsStore(this).update { it.copy(theme = theme) }
         val root = LinearLayout(this).apply {
