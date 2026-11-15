@@ -35,11 +35,15 @@ android {
 
     signingConfigs {
         create("testRelease") {
-            val storePath = System.getenv("KEYSTORE_FILE") ?: "../keystore/o24-test.jks"
-            storeFile = file(storePath)
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "o24keyboard"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "o24"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "o24keyboard"
+            // GitHub Actions sets unset secrets to empty strings. An empty value must
+            // not replace the committed test key (alias o24, password o24keyboard).
+            fun envOrDefault(name: String, default: String): String =
+                System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
+
+            storeFile = file(envOrDefault("KEYSTORE_FILE", "../keystore/o24-test.jks"))
+            storePassword = envOrDefault("KEYSTORE_PASSWORD", "o24keyboard")
+            keyAlias = envOrDefault("KEY_ALIAS", "o24")
+            keyPassword = envOrDefault("KEY_PASSWORD", "o24keyboard")
         }
     }
 

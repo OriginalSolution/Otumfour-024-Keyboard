@@ -44,16 +44,29 @@ jobs:
             echo "No KEYSTORE_BASE64 secret. Release APK will use the committed test key."
           fi
 
-      - name: Build debug and release APKs
+      - name: Assemble debug APK and unit tests
+        id: debug
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug testDebugUnitTest --stacktrace
+
+      - name: Assemble release APK
+        id: release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          chmod +x ./gradlew
-          ./gradlew assembleDebug assembleRelease testDebugUnitTest --stacktrace
+          # Unset secrets arrive as empty strings and would override the test key.
+          # Keep them only when a real keystore file was produced from KEYSTORE_BASE64.
+          if [ -z "${KEYSTORE_FILE:-}" ]; then
+            unset KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD
+          fi
+          ./gradlew assembleRelease --stacktrace
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APKs
+        if: always() && steps.debug.outcome == 'success'
+        uses: actions/upload-artifact@v4
         with:
           name: o24-keyboard-apk
           path: |
@@ -65,7 +78,43 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: O24 Keyboard ${{ github.ref_name }}
+          generate_release_notes: false
           files: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
-          generate_release_notes: true
+          body: |
+            O24 Keyboard (Otumfour) is an Android input method made in honour of the Asantehene. It is not a publication of Manhyia Palace. No person is depicted.
+
+            Install the debug APK to try it, or the release APK signed with the test key unless repository signing secrets were set. Enable O24 Keyboard in Android settings, then choose it as your input method. The first launch asks you to enable it and pick a theme.
+
+            ## Features
+            - QWERTY, shift and caps, numbers and symbols, emoji, backspace, and enter
+            - Spacebar labelled O24 Keyboard, or OTUMFOUR on the Sika Dwa Kofi theme
+            - Suggestion bar with three candidates, edit-distance correction, frequency ranking, and words learned on the phone
+            - Serwaa voice typing and spoken replies, using the TraffiAlert GH voice settings (British English, rate 0.95, pitch 1.05)
+            - AI rewrite and translate through a configurable endpoint, only when you save a key
+            - Onboarding, settings, and an About page for Otumfuo
+            - Ten drawn themes, with a history card for each
+
+            ## Themes
+            1. Golden Stool Royal
+            2. Kente Vibrant
+            3. Adinkra Minimal
+            4. Asante Flag
+            5. Sika Dwa Kofi
+            6. Royal Crest
+            7. Okomfo Anokye
+            8. Yaa Asantewaa
+            9. Jersey Edition: Kotoko (original quill motif, not the club crest)
+            10. Jersey Edition: Asanteman
+
+            ## Languages
+            English, Asante Twi, Akuapem Twi, Fante, Ga, Ewe, Dagbani, Dagaare, Gonja, Nzema, Kasem, and Hausa as written in Ghana. The extra letter row changes with the language.
+
+            ## Known limitations
+            - Dictionaries are seeds. Several Ghanaian lists are short and need native-speaker review.
+            - Spoken replies stay on the English Serwaa voice. Most Ghanaian languages have no reliable Android text-to-speech.
+            - Serwaa's recorded timbre is the TraffiAlert mp3 set, which is not bundled. Import the clips or set your own TTS endpoint.
+            - Rewrite and translate do nothing until you save an endpoint and a key in the app. No key is built in.
+            - Without KEYSTORE_BASE64 and the matching password secrets, the release APK is signed with the committed test key. Do not use that key for the Play Store.
