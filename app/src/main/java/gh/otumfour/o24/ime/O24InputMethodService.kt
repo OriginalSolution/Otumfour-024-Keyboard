@@ -59,6 +59,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         aiEndpoint = "",
         aiModel = "gpt-4o-mini",
         aiKey = "",
+        aiEnabled = false,
         ttsEndpoint = "",
         ttsKey = "",
     )
@@ -381,13 +382,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             showStatus("Type or select something for Serwaa to rewrite.")
             return
         }
-        if (settings.aiKey.isBlank() || settings.aiEndpoint.isBlank()) {
-            val message = if (settings.aiKey.isBlank()) {
-                "Set an AI key in O24 Keyboard settings to use rewrite."
-            } else {
-                "Add an AI endpoint in O24 Keyboard settings to use rewrite."
-            }
-            showStatus(message)
+        aiUnavailable()?.let {
+            showStatus(it)
             return
         }
         showTones(target)
@@ -428,11 +424,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             showStatus("Type or select something for Serwaa to translate.")
             return
         }
-        if (settings.aiKey.isBlank() || settings.aiEndpoint.isBlank()) {
-            showStatus(
-                if (settings.aiKey.isBlank()) "Set an AI key in O24 Keyboard settings to translate."
-                else "Add an AI endpoint in O24 Keyboard settings to translate.",
-            )
+        aiUnavailable()?.let {
+            showStatus(it)
             return
         }
         val (source, targetLang) = translationPair()
@@ -470,6 +463,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         } else {
             active to KeyboardLanguage.ENGLISH
         }
+    }
+
+    private fun aiUnavailable(): String? {
+        if (!settings.aiEnabled) return "Turn on AI in O24 Keyboard settings to rewrite and translate."
+        if (settings.aiKey.isBlank()) return "Set an AI key in O24 Keyboard settings to use this."
+        if (settings.aiEndpoint.isBlank()) return "Add an AI endpoint in O24 Keyboard settings to use this."
+        return null
     }
 
     private fun client() = AiClient(settings.aiEndpoint, settings.aiKey, settings.aiModel)
