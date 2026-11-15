@@ -2,15 +2,23 @@ package gh.otumfour.o24.ui
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import gh.otumfour.o24.ime.BoardPage
+import gh.otumfour.o24.ime.KeyboardModel
+import gh.otumfour.o24.ime.KeySpec
+import gh.otumfour.o24.ime.ShiftState
+import gh.otumfour.o24.lang.KeyboardLanguage
+import gh.otumfour.o24.theme.GoldenStool
 import gh.otumfour.o24.theme.ThemeArt
 import gh.otumfour.o24.theme.ThemeId
 import gh.otumfour.o24.theme.colorsFor
 
+/**
+ * A scaled keyboard in the real theme: art, suggestion bar, QWERTY, and the space bar.
+ */
 class ThemePreviewView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -18,6 +26,7 @@ class ThemePreviewView @JvmOverloads constructor(
     init {
         setWillNotDraw(false)
     }
+
     var theme: ThemeId = ThemeId.GOLDEN_STOOL
         set(value) {
             field = value
@@ -25,68 +34,103 @@ class ThemePreviewView @JvmOverloads constructor(
         }
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val label = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
-    private val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-        isFakeBoldText = true
+    private val keyRect = RectF()
+    private var rowTheme: ThemeId? = null
+    private var rows: List<List<KeySpec>> = emptyList()
+
+    private fun rows(): List<List<KeySpec>> {
+        if (rowTheme != theme) {
+            rowTheme = theme
+            rows = KeyboardModel.rows(
+                BoardPage.LETTERS,
+                KeyboardLanguage.ENGLISH,
+                ShiftState.OFF,
+                "Enter",
+                colorsFor(theme).spaceTitle,
+            )
+        }
+        return rows
     }
 
     override fun onDraw(canvas: Canvas) {
-        val scene = theme == ThemeId.OKOMFO_ANOKYE || theme == ThemeId.YAA_ASANTEWAA || theme.jersey
-        when (theme) {
-            ThemeId.YAA_ASANTEWAA -> {
-                ThemeArt.drawYaaHeader(canvas, width, height)
-                title.color = Color.parseColor("#F3D37A")
-                title.textSize = dp(15f)
-                canvas.drawText("YAA ASANTEWAA", width / 2f, dp(22f), title)
-                label.color = Color.parseColor("#E6D3A1")
-                label.textSize = dp(10f)
-                canvas.drawText("Queen Mother of Ejisu, 1900", width / 2f, dp(36f), label)
-            }
-            ThemeId.OKOMFO_ANOKYE -> ThemeArt.drawOkomfoScene(canvas, width, height)
-            ThemeId.KOTOKO -> {
-                ThemeArt.drawKotokoHeader(canvas, width, height)
-                title.color = Color.WHITE
-                title.textSize = dp(28f)
-                canvas.drawText("24", width / 2f, height * 0.34f, title)
-                title.textSize = dp(16f)
-                canvas.drawText("O24", width / 2f, height * 0.48f, title)
-                label.color = Color.parseColor("#F2E6C8")
-                label.textSize = dp(10f)
-                canvas.drawText("Porcupine Warriors spirit", width / 2f, height * 0.58f, label)
-            }
-            ThemeId.ASANTEMAN_JERSEY -> {
-                ThemeArt.drawAsantemanHeader(canvas, width, height)
-                title.color = Color.parseColor("#F3D37A")
-                title.textSize = dp(28f)
-                canvas.drawText("24", width * 0.62f, height * 0.42f, title)
-                title.textSize = dp(13f)
-                canvas.drawText("ASANTEMAN", width * 0.62f, height * 0.56f, title)
-            }
-            else -> ThemeArt.draw(canvas, theme, width, height)
-        }
+        ThemeArt.draw(canvas, theme, width, height)
         val colors = colorsFor(theme)
-        val gap = dp(6f)
-        val keyH = height * if (scene) 0.16f else 0.28f
-        val top = height - keyH - dp(8f)
-        val letters = listOf("O", "2", "4")
-        val keyW = (width - gap * (letters.size + 1)) / letters.size
-        var x = gap
-        letters.forEach { letter ->
-            val rect = RectF(x, top, x + keyW, top + keyH)
-            val goldKey = letter == "4"
-            fill.style = Paint.Style.FILL
-            fill.color = if (goldKey) colors.accentFill else colors.keyFill
-            canvas.drawRoundRect(rect, dp(colors.cornerDp), dp(colors.cornerDp), fill)
-            fill.style = Paint.Style.STROKE
-            fill.strokeWidth = dp(1.3f)
-            fill.color = if (goldKey) colors.accentFill else colors.keyStroke
-            canvas.drawRoundRect(rect, dp(colors.cornerDp), dp(colors.cornerDp), fill)
-            label.color = if (goldKey) colors.accentLabel else colors.keyLabel
-            label.textSize = dp(14f)
-            val baseline = rect.centerY() - (label.descent() + label.ascent()) / 2f
-            canvas.drawText(letter, rect.centerX(), baseline, label)
-            x += keyW + gap
+        val gap = dp(3f)
+        val suggestionH = height * 0.14f
+        fill.style = Paint.Style.FILL
+        fill.color = colors.suggestionBg
+        canvas.drawRect(0f, 0f, width.toFloat(), suggestionH, fill)
+        label.color = colors.suggestionText
+        label.textSize = suggestionH * 0.42f
+        label.isFakeBoldText = false
+        val samples = listOf("Akwaaba", "Ghana", "O24")
+        val slot = width / 3f
+        samples.forEachIndexed { index, word ->
+            val baseline = suggestionH * 0.68f
+            canvas.drawText(word, slot * index + slot / 2f, baseline, label)
+        }
+        val keyTop = suggestionH + gap
+        val drawn = rows()
+        val keyArea = height - keyTop - gap
+        val rowH = (keyArea - gap * (drawn.size - 1)) / drawn.size
+        var y = keyTop
+        val radius = dp(colors.cornerDp.coerceAtMost(10f))
+        for (row in drawn) {
+            val weight = row.sumOf { it.weight.toDouble() }.toFloat()
+            var x = gap
+            val inner = width - gap * 2 - gap * (row.size - 1)
+            for (key in row) {
+                val w = inner * (key.weight / weight)
+                keyRect.set(x, y, x + w, y + rowH)
+                val (bg, fg, border) = paints(key, colors)
+                fill.color = bg
+                canvas.drawRoundRect(keyRect, radius, radius, fill)
+                if (border != 0) {
+                    stroke.color = border
+                    stroke.strokeWidth = dp(1f)
+                    canvas.drawRoundRect(keyRect, radius, radius, stroke)
+                }
+                if (colors.stoolOnSpace && key.role == KeySpec.Role.SPACE) {
+                    GoldenStool.draw(
+                        canvas,
+                        keyRect.centerX(),
+                        keyRect.top + dp(2f),
+                        keyRect.height() * 1.05f,
+                        colors.spaceLabel,
+                        alpha = 90,
+                    )
+                }
+                label.color = fg
+                label.isFakeBoldText = key.role == KeySpec.Role.SPACE
+                var size = rowH * 0.42f
+                label.textSize = size
+                val limit = keyRect.width() * 0.86f
+                while (size > dp(7f) && label.measureText(key.label) > limit) {
+                    size *= 0.9f
+                    label.textSize = size
+                }
+                val baseline = keyRect.centerY() - (label.descent() + label.ascent()) / 2f
+                canvas.drawText(key.label, keyRect.centerX(), baseline, label)
+                x += w + gap
+            }
+            y += rowH + gap
+        }
+    }
+
+    private fun paints(key: KeySpec, theme: gh.otumfour.o24.theme.ThemeColors): Triple<Int, Int, Int> {
+        if (theme.shiftFill != 0 && key.action == gh.otumfour.o24.ime.KeyAction.SHIFT) {
+            return Triple(theme.shiftFill, theme.shiftLabel, theme.shiftFill)
+        }
+        if (theme.enterFill != 0 && key.action == gh.otumfour.o24.ime.KeyAction.ENTER) {
+            return Triple(theme.enterFill, theme.enterLabel, theme.enterFill)
+        }
+        return when (key.role) {
+            KeySpec.Role.SPACE -> Triple(theme.spaceFill, theme.spaceLabel, theme.keyStroke)
+            KeySpec.Role.ACCENT -> Triple(theme.accentFill, theme.accentLabel, theme.keyStroke)
+            KeySpec.Role.ACTION -> Triple(theme.actionFill, theme.actionLabel, theme.keyStroke)
+            KeySpec.Role.LETTER -> Triple(theme.keyFill, theme.keyLabel, theme.keyStroke)
         }
     }
 

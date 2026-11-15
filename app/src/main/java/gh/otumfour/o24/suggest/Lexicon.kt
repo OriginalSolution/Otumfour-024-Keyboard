@@ -78,12 +78,8 @@ class Lexicon(entries: List<Pair<String, Int>>) {
         }
 
         /** Word to commit when space is pressed, or null to keep what the user typed. */
-        fun autocorrect(typed: String, suggestions: List<Suggestion>): String? {
-            if (typed.length < 3) return null
-            if (suggestions.any { it.distance == 0 && !it.completion && it.word == typed.lowercase() }) return null
-            val best = suggestions.firstOrNull { !it.completion && it.distance in 1..MAX_DISTANCE } ?: return null
-            return best.word
-        }
+        fun autocorrect(typed: String, suggestions: List<Suggestion>, known: Boolean = false, rejected: Set<String> = emptySet()): String? =
+            Autocorrect.choose(typed, suggestions, known, rejected)
 
         fun matchCase(typed: String, suggestion: String): String {
             val letters = typed.filter { it.isLetter() }

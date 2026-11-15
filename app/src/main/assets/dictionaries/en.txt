@@ -209,7 +209,6 @@ taxi	10
 lorry	8
 station	10
 junction	8
-traffic	10
 help	16
 stop	14
 wait	12

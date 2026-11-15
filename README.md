@@ -1,6 +1,6 @@
 # Otumfour · O24 Keyboard
 
-O24 Keyboard, also called Otumfour, is an Android keyboard made in honour of the Asantehene, the king of Asante (Ashanti) in Ghana. It is an independent app. It is not a publication of Manhyia Palace, and it does not depict the Asantehene or any other person.
+O24 Keyboard, also called Otumfour, is an Android keyboard made in honour of the Asantehene, the king of Asante (Ashanti) in Ghana. It is an independent app. It is not a publication of Manhyia Palace. The welcome slide shows one credited photograph of Otumfuo Osei Tutu II. The keyboard itself does not depict a person.
 
 The name Otumfour is a popular spelling of the title Otumfuo. O24 is the short name.
 
@@ -8,15 +8,14 @@ The name Otumfour is a popular spelling of the title Otumfuo. O24 is the short n
 
 - A full input method (QWERTY, shift and caps, numbers and symbols, backspace, enter, emoji, and a spacebar). The spacebar reads **O24 Keyboard**, or **OTUMFOUR** in the Sika Dwa Kofi theme.
 - Ghanaian languages on a switcher pill: English, Asante Twi, Akuapem Twi, Fante, Ga, Ewe, Dagbani, Dagaare, Gonja, Nzema, Kasem, and Hausa as written in Ghana. The extra letter row changes with the language (`ɛ ɔ ŋ ƒ ʋ ɖ ɣ`, and Hausa `ɓ ɗ ƙ ƴ`, with capitals).
-- A suggestion bar with three candidates. Correction uses edit distance and word frequency. Words you accept are remembered on the phone. Seed lists live in `app/src/main/assets/dictionaries/` as `word` or `word<tab>frequency`. Add lines to extend a language. Lines starting with `#` are comments.
-- **Serwaa**, the voice from TraffiAlert GH. Tap the mic to dictate. Hold it to hear a greeting. She speaks replies with the same Android settings as TraffiAlert: British English, rate `0.95`, pitch `1.05`, navigation-guidance audio, and the clearest installed offline voice of the same family. See below.
-- **AI** rewrite (Improve, Formal, Casual, Shorter, Fix spelling) and translate into English, Asante Twi, Akuapem Twi, Fante, Ga, Ewe, Dagbani, Dagaare, Gonja, Nzema, Kasem, or Hausa. This runs through O24's server. No key is stored in the app. Text is sent only when you tap AI or Translate. An optional OpenAI-compatible endpoint under Advanced is used only if the endpoint, model, and key are all filled in.
-- Ten themes, chosen from a swipe carousel in onboarding and again from settings. Jersey Edition is labelled on its own pages. Each theme has a history card. You can switch back to any theme, including Golden Stool Royal. Patterns are original drawings. The welcome slide uses one real photograph: Otumfuo Osei Tutu II in regalia, by Zackagonii, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ashanti_King_Otumfour_Osei_Tutu_II.jpg). The app credits that photo on the About page.
-- A settings app: enable the keyboard, pick a theme, choose languages, personalise Serwaa, set AI and optional cloud TTS, and read an About page for Otumfuo.
+- A suggestion bar with three candidates. Correction is conservative: a word that is already in a dictionary or learned list is kept, and an automatic change happens only for a one-step edit of a frequent word, on space or punctuation. Backspace puts the original back. Seed lists live in `app/src/main/assets/dictionaries/` as `word` or `word<tab>frequency`. Add lines to extend a language. Lines starting with `#` are comments.
+- **AI** rewrite (Improve, Formal, Casual, Shorter, Fix spelling) and translate into English, Asante Twi, Akuapem Twi, Fante, Ga, Ewe, Dagbani, Dagaare, Gonja, Nzema, Kasem, or Hausa. This runs through O24's server. No key is stored in the app. Text is sent only when you tap AI or Translate. Settings shows an on/off switch and a short privacy note. A custom endpoint is hidden until the version number on About is tapped seven times, and it is used only if the endpoint, model, and key are all filled in.
+- Ten themes, each shown as a real mini keyboard in a carousel during onboarding and again from settings. Each theme has a history card. You can switch back to any theme, including Golden Stool Royal. Patterns are original drawings. The welcome slide uses one real photograph: Otumfuo Osei Tutu II in regalia, by Zackagonii, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ashanti_King_Otumfour_Osei_Tutu_II.jpg). The app credits that photo on the About page.
+- A settings home with cards for Themes, Languages, Typing, AI, Learned words, and About. Languages use a default-language selector. Typing holds autocorrect, auto-capitalise, vibration, and key sound. Layouts follow window size: centred on a normal phone, a wider column on a large phone or fold, and two panes on a tablet.
 
 ### Themes
 
-1. **Golden Stool Royal** — black keys, gold edges, a gold weave, a glowing Serwaa mic.
+1. **Golden Stool Royal** — black keys, gold edges, and a gold weave.
 2. **Kente Vibrant** — gold, green, red, and black stripes behind white rounded keys.
 3. **Adinkra Minimal** — charcoal, faint Gye Nyame and Sankofa, gold shift and enter.
 4. **Asante Flag** — gold, black, and green bands with a faint Golden Stool. Dark translucent keys, white letters.
@@ -34,44 +33,13 @@ The Golden Stool is drawn as an Asante stool: a curved crescent seat, a carved p
 
 History cards are in `app/src/main/res/values/strings.xml` so they can be translated. They end with the note “Summaries are for cultural appreciation.”
 
-## Serwaa, from TraffiAlert GH
-
-Searched these repositories for a Serwaa voice model, voice id, TTS config, prompts, and audio:
-
-| Repository | What is there |
-| --- | --- |
-| [OriginalSolution/traffitech-gh-alert](https://github.com/OriginalSolution/traffitech-gh-alert) branch `cursor/traffialert-gh-v1-4c59` | The voice. Not on `main`. |
-| [TraffiAlertGH/traffialert-site](https://github.com/TraffiAlertGH/traffialert-site) | Landing page. Maame portrait assets. No Serwaa voice. `HANDOFF.md` points at the app branch above. |
-| [OriginalSolution/traffialert-site](https://github.com/OriginalSolution/traffialert-site) | Older site checkout. Maame images. No Serwaa voice. |
-| [TraffiAlertGH/traffialert-pay](https://github.com/TraffiAlertGH/traffialert-pay) | Empty repository. |
-
-What the app branch actually contains:
-
-- The name **Serwaa**, spoken **Sirwaah**. The recorded introduction is: “Hi, I'm Sirwaah, your Traffic Alert voice.”
-- Hundreds of mp3 clips in `assets/voice/serwaa/`, generated as recorded lines (`scripts/serwaa-lines.json`, `src/i18n/voice/speak.ts`). That is the timbre. There is **no ElevenLabs, OpenAI, or other cloud voice id** in the source.
-- Android TTS fallback in `AlertVoice.kt`: locale `en-GB` (then `en-US`), rate `0.95`, pitch `1.05`, usage `ASSISTANCE_NAVIGATION_GUIDANCE`, and the highest-quality installed offline voice of the same family.
-- `docs/VOICE_RECORDING.md` says Khaya / GhanaNLP could synthesise Ghanaian languages, but TraffiAlert does not call it. That API would need the publisher’s own key. No such key is stored in the repo.
-
-This keyboard uses that persona and those TTS settings. It does **not** copy secret keys.
-
-The clip files could not be copied into this repo from here: the build environment’s git credential cannot read the private TraffiAlert app repo. If you have a checkout, run:
-
-```bash
-scripts/import-serwaa-clips.sh /path/to/traffitech-gh-alert
-```
-
-That copies `intro.mp3`, `welcome_back.mp3`, `praise.mp3`, and `app_on.mp3`. Lines that match those clips then play Serwaa’s recording. Everything else uses the phone voice with her settings.
-
-A cloud voice can be attached later. In settings, set a TTS URL and key. The keyboard `POST`s JSON (`text`, `voice: serwaa`, `language: en-GB`, `rate`, `pitch`) and expects `audio/mpeg` or `audio/wav` back. If that fails, it falls back to Android TTS. Nothing is hardcoded.
-
 ## Keys you may set
 
 None of these are required to install or type.
 
 | Setting | Where | Needed for |
 | --- | --- | --- |
-| AI endpoint, model, and key | Optional, under Advanced. Used only if all three are filled in | Your own OpenAI-compatible server instead of O24 AI |
-| Cloud TTS endpoint and key | In the app | Optional recorded-style playback from your own Serwaa service |
+| AI endpoint, model, and key | Hidden. Tap the version number on About seven times. Used only if all three are filled in | Your own OpenAI-compatible server instead of O24 AI |
 | `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` | GitHub Actions secrets | Optional. Without them the release APK is signed with the committed **test** key (`keystore/o24-test.jks`, password `o24keyboard`, alias `o24`). Do not use that key for Play Store. |
 
 Rewrite and translate use O24's server by default. Text is sent only after you tap **AI** or **Translate**, and only up to 2000 characters. Password fields are skipped. The OpenAI key is not in this app.
@@ -109,7 +77,7 @@ Sideload:
 2. If Android asks, allow install from this source.
 3. Open **O24 Keyboard**. The first screen asks you to enable it, then to choose a theme.
 4. Enable it under **Settings → System → Languages & input → On-screen keyboard** (wording varies). Then select **O24 Keyboard** in the input picker.
-5. Allow the microphone if you want Serwaa to take dictation.
+5. Open a text field and choose O24 Keyboard if it is not already selected.
 
 ## Build
 
@@ -120,7 +88,5 @@ Sideload:
 ## Limits
 
 - The dictionaries are seeds, not full lexicons. Several Ghanaian lists are short and marked for native-speaker review. Suggestions improve as you add lines or as the keyboard learns words.
-- Twi, Ga, Ewe, and most other Ghanaian languages have no reliable Android voice. Serwaa’s spoken replies stay on the TraffiAlert English voice (`en-GB`). Dictation uses `en-GH`, or `ha-GH` for Hausa, which depends on what the phone has installed.
-- Her exact timbre is the TraffiAlert mp3 set. Until those clips are imported, or you point settings at a TTS service that returns her audio, you hear the phone voice with her rate, pitch, and locale.
-- Built-in AI sends the text you ask to rewrite or translate, up to 2000 characters, to O24's server. A custom endpoint is used only if you fill in the endpoint, model, and key.
-- There is no picture of a person anywhere in this project on purpose.
+- Built-in AI sends the text you ask to rewrite or translate, up to 2000 characters, to O24's server. A custom endpoint is used only if you fill in the endpoint, model, and key after unlocking developer tools.
+- The only photograph of a person is the credited regalia portrait on the welcome slide. It is not shown on the keyboard.

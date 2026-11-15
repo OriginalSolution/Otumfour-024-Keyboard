@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <activity
+            android:name=".ui.OnboardingActivity"
+            android:exported="true"
+            tools:replace="android:exported" />
+        <activity
+            android:name=".ui.TryActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+    </application>
+</manifest>
