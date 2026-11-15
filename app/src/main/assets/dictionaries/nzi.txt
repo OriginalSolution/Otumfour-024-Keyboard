@@ -1,0 +1,27 @@
+# Nzema seed. Akan-related. NEEDS NATIVE SPEAKER REVIEW.
+# word or word<tab>frequency. Add lines to extend this language.
+me	24
+wo	20
+ɔ	10
+yɛ	16
+kɔ	12
+bra	12
+ɛlɛkɛ	16
+meda	12
+ase	12
+ɛte	12
+nzema	16
+axim	8
+ghana	10
+nsu	10
+edwuma	8
+fie	8
+sukuu	6
+aane	10
+dabi	8
+sika	8
+nana	8
+ɛ	6
+ɔ	6
+kasa	8
+tie	6

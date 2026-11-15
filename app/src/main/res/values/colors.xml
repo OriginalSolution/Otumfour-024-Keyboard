@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="royal_bg">#0C0A07</color>
+    <color name="gold">#D4AF37</color>
+    <color name="gold_bright">#F3D37A</color>
+    <color name="ink">#F6F1E4</color>
+    <color name="kente_gold">#F2C200</color>
+    <color name="kente_green">#0B7A3B</color>
+    <color name="kente_red">#C8102E</color>
+    <color name="kente_black">#111111</color>
+    <color name="adinkra_bg">#1C1C1C</color>
+</resources>

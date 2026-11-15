@@ -1,0 +1,26 @@
+# Dagaare seed. Short on purpose. NEEDS NATIVE SPEAKER REVIEW.
+# word or word<tab>frequency. Add lines to extend this language.
+n	20
+fo	22
+o	12
+ba	10
+te	10
+bareka	16
+zurɛ	10
+saa	8
+di	10
+nyu	8
+wa	10
+kye	8
+zaa	8
+ghana	10
+wa	12
+dagaare	14
+ɛ	6
+ɔ	6
+ʋ	6
+ɩ	6
+ŋ	4
+yeli	8
+pampana	6
+sɔgla	4

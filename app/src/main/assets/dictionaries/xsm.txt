@@ -1,0 +1,22 @@
+# Kasem seed. Short on purpose. NEEDS NATIVE SPEAKER REVIEW.
+# word or word<tab>frequency. Add lines to extend this language.
+n	16
+a	14
+o	10
+nyuuge	12
+ban	8
+kasem	14
+kasena	10
+navrongo	8
+ghana	10
+di	8
+nyu	6
+wa	8
+ba	6
+ɛ	4
+ɔ	4
+ɩ	4
+ʋ	4
+ŋ	4
+chana	4
+woo	6

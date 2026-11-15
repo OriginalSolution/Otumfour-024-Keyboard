@@ -1,0 +1,37 @@
+# Dagbani seed. NEEDS NATIVE SPEAKER REVIEW.
+# word or word<tab>frequency. Add lines to extend this language.
+n	30
+a	28
+o	20
+ti	22
+yi	16
+bɛ	16
+ni	20
+ka	18
+di	16
+nyu	12
+chan	12
+despa	16
+naa	18
+dasuba	12
+aninwula	10
+bindirigu	10
+kom	14
+yili	12
+soli	10
+ghana	12
+tamale	16
+dagbanli	14
+dagbani	10
+ninvuɣu	8
+paɣa	8
+doo	8
+bia	8
+pam	10
+biɛla	10
+saha	8
+naawuni	8
+mbo	6
+nye	8
+mali	8
+zoo	6

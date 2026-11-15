@@ -1,0 +1,20 @@
+# Gonja seed. Short on purpose. NEEDS NATIVE SPEAKER REVIEW.
+# word or word<tab>frequency. Add lines to extend this language.
+n	16
+a	14
+e	10
+anyɛ	14
+asuma	12
+nkyɛ	10
+ghana	10
+bole	8
+gonja	14
+ngbanya	8
+kike	6
+shu	6
+ko	8
+be	8
+fo	6
+ɛ	4
+ɔ	4
+ŋ	4

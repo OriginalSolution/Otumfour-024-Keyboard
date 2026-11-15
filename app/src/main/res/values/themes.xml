@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.O24" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/royal_bg</item>
+        <item name="android:navigationBarColor">@color/royal_bg</item>
+        <item name="android:windowBackground">@color/royal_bg</item>
+        <item name="colorPrimary">@color/gold</item>
+        <item name="colorPrimaryVariant">@color/gold_bright</item>
+        <item name="colorOnPrimary">#1A1408</item>
+        <item name="colorSecondary">@color/gold_bright</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">#CDBF98</item>
+    </style>
+</resources>
