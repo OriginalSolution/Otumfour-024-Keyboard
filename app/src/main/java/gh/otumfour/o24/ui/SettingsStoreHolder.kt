@@ -5,7 +5,9 @@ import gh.otumfour.o24.data.SettingsStore
 
 /** Small bridge so onboarding can mark itself finished without a second store type. */
 object SettingsStoreHolder {
-    fun markDone(context: Context) {
-        SettingsStore(context).setOnboarded()
+    fun markDone(context: Context): Boolean {
+        val store = SettingsStore(context)
+        val saved = store.setOnboarded()
+        return saved && store.isOnboarded()
     }
 }

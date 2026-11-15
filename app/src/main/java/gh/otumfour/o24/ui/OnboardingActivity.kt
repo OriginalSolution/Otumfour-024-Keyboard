@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.R
+import gh.otumfour.o24.data.SettingsStore
 
 /** Welcome, enable, choose the keyboard, pick a theme, then finish. */
 class OnboardingActivity : AppCompatActivity() {
@@ -33,17 +34,35 @@ class OnboardingActivity : AppCompatActivity() {
     private var freezeAdvance = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
+        val store = SettingsStore(this)
+        if (store.isOnboarded()) {
+            openSettings()
+            return
+        }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goBack()
         })
-        val start = savedInstanceState?.getInt(STATE_PAGE) ?: intent.getIntExtra(EXTRA_PAGE, 0)
-        installUi(start.coerceIn(0, PAGE_COUNT - 1))
+        val start = OnboardingRouter.resumePage(
+            stored = store.onboardingPage(),
+            requested = if (intent.hasExtra(EXTRA_PAGE)) intent.getIntExtra(EXTRA_PAGE, 0) else null,
+            restored = savedInstanceState?.getInt(STATE_PAGE),
+        )
+        installUi(start)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        if (::pager.isInitialized) outState.putInt(STATE_PAGE, pager.currentItem)
+        if (::pager.isInitialized) {
+            outState.putInt(STATE_PAGE, pager.currentItem)
+            SettingsStore(this).setOnboardingPage(pager.currentItem)
+        }
+    }
+
+    override fun onPause() {
+        if (::pager.isInitialized) SettingsStore(this).setOnboardingPage(pager.currentItem)
+        super.onPause()
     }
 
     override fun onResume() {
@@ -100,8 +119,10 @@ class OnboardingActivity : AppCompatActivity() {
         row.addView(primary, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(row)
         setContentView(root)
+        root.applySystemBarInsets()
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
+                SettingsStore(this@OnboardingActivity).setOnboardingPage(position)
                 bindChrome(position)
                 maybeAdvance()
             }
@@ -149,8 +170,17 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun finishOnboarding() {
-        SettingsStoreHolder.markDone(this)
-        startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_AFTER_ONBOARDING, true))
+        if (!SettingsStoreHolder.markDone(this)) SettingsStore(this).setOnboarded()
+        SettingsStore(this).setOnboardingPage(0)
+        openSettings()
+    }
+
+    private fun openSettings() {
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_AFTER_ONBOARDING, true)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+        )
         finish()
     }
 
@@ -325,7 +355,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_PAGE = "page"
-        private const val PAGE_COUNT = 5
+        private const val PAGE_COUNT = OnboardingRouter.PAGE_COUNT
         private const val STATE_PAGE = "page"
     }
 }

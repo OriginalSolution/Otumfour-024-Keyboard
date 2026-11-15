@@ -19,6 +19,7 @@ import gh.otumfour.o24.ime.ShiftState
 /** Debug-only field used to photograph the keyboard. Not in the launcher. */
 class TryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
         val theme = ThemeId.fromStorage(intent.getStringExtra("theme"))
         SettingsStore(this).update { it.copy(theme = theme) }
@@ -56,6 +57,7 @@ class TryActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
         setContentView(root)
+        root.applySystemBarInsets()
         if (!intent.getBooleanExtra("preview", false)) {
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
             field.requestFocus()

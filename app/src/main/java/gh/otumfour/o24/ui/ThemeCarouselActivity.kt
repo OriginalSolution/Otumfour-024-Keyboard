@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 /** The theme carousel used from settings, after onboarding. */
 class ThemeCarouselActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -23,5 +24,6 @@ class ThemeCarouselActivity : AppCompatActivity() {
             1f,
         ))
         setContentView(column)
+        column.applySystemBarInsets()
     }
 }
