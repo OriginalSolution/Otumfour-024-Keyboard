@@ -93,7 +93,7 @@ jobs:
             - Spacebar labelled O24 Keyboard, or OTUMFOUR on the Sika Dwa Kofi theme
             - Suggestion bar with three candidates, edit-distance correction, frequency ranking, and words learned on the phone
             - Serwaa voice typing and spoken replies, using the TraffiAlert GH voice settings (British English, rate 0.95, pitch 1.05)
-            - AI rewrite and translate through a configurable endpoint, only when you save a key
+            - AI rewrite and translate through O24's server, with no key in the app. Text is sent only when you tap AI or Translate
             - Onboarding, settings, and an About page for Otumfuo
             - Ten drawn themes, with a history card for each
 
@@ -116,5 +116,5 @@ jobs:
             - Dictionaries are seeds. Several Ghanaian lists are short and need native-speaker review.
             - Spoken replies stay on the English Serwaa voice. Most Ghanaian languages have no reliable Android text-to-speech.
             - Serwaa's recorded timbre is the TraffiAlert mp3 set, which is not bundled. Import the clips or set your own TTS endpoint.
-            - Rewrite and translate do nothing until you save an endpoint and a key in the app. No key is built in.
+            - Built-in AI sends the text you ask to rewrite or translate (up to 2000 characters) to O24's server. A custom endpoint is used only if you fill in the endpoint, model, and key.
             - Without KEYSTORE_BASE64 and the matching password secrets, the release APK is signed with the committed test key. Do not use that key for the Play Store.

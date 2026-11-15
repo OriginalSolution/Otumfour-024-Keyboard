@@ -18,6 +18,7 @@ import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import gh.otumfour.o24.ai.AiClient
 import gh.otumfour.o24.ai.AiResult
@@ -160,10 +161,17 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
         toneRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            visibility = View.GONE
             setPadding(dp(6), dp(4), dp(6), dp(4))
         }
-        column.addView(toneRow, matchWrap())
+        column.addView(
+            HorizontalScrollView(this).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(toneRow)
+                visibility = View.GONE
+                tag = "ai-choices"
+            },
+            matchWrap(),
+        )
 
         val toolbar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -383,7 +391,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             return
         }
         aiUnavailable()?.let {
-            showStatus(it)
+            showAiProblem(it)
             return
         }
         showTones(target)
@@ -392,24 +400,61 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private fun showTones(target: EditTarget) {
         val row = toneRow ?: return
         row.removeAllViews()
-        row.visibility = View.VISIBLE
-        listOf("Clear", "Formal", "Warm", "Shorter").forEach { tone ->
-            row.addView(pill(tone).also { button ->
+        showChoices()
+        listOf(
+            "Improve" to "improve",
+            "Formal" to "formal",
+            "Casual" to "casual",
+            "Shorter" to "shorter",
+            "Fix spelling" to "fix",
+        ).forEach { (label, style) ->
+            row.addView(pill(label).also { button ->
                 button.setOnClickListener {
-                    row.visibility = View.GONE
-                    runRewrite(target, tone)
+                    hideChoices()
+                    runRewrite(target, style)
                 }
             }, marginStart())
         }
-        showStatus("Pick a tone.")
+        showStatus("Pick a style.")
     }
 
-    private fun runRewrite(target: EditTarget, tone: String) {
-        showStatus("Serwaa is rewriting…")
+    private fun showLanguages(text: String) {
+        val row = toneRow ?: return
+        row.removeAllViews()
+        showChoices()
+        KeyboardLanguage.entries.forEach { language ->
+            row.addView(pill(language.shortLabel).also { button ->
+                button.setOnClickListener {
+                    hideChoices()
+                    runTranslate(text, language.englishName)
+                }
+            }, marginStart())
+        }
+        showStatus("Translate into…")
+    }
+
+    private fun showChoices() {
+        (toneRow?.parent as? View)?.visibility = View.VISIBLE
+    }
+
+    private fun hideChoices() {
+        (toneRow?.parent as? View)?.visibility = View.GONE
+        toneRow?.removeAllViews()
+    }
+
+    private fun runRewrite(target: EditTarget, style: String) {
+        showStatus("Rewriting…")
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                client().rewrite(SerwaaPersona.systemPrompt(settings.userName), target.text, tone)
-            }
+            val result = withContext(Dispatchers.IO) { client().rewrite(target.text, style) }
+            applyAi(target, result, speak = true)
+        }
+    }
+
+    private fun runTranslate(text: String, targetName: String) {
+        val target = captureTarget() ?: return
+        showStatus("Translating…")
+        scope.launch {
+            val result = withContext(Dispatchers.IO) { client().translate(text, targetName) }
             applyAi(target, result, speak = true)
         }
     }
@@ -425,22 +470,10 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             return
         }
         aiUnavailable()?.let {
-            showStatus(it)
+            showAiProblem(it)
             return
         }
-        val (source, targetLang) = translationPair()
-        showStatus("Serwaa is translating…")
-        scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                client().translate(
-                    SerwaaPersona.systemPrompt(settings.userName),
-                    target.text,
-                    source.englishName,
-                    targetLang.englishName,
-                )
-            }
-            applyAi(target, result, speak = true)
-        }
+        showLanguages(target.text)
     }
 
     private fun applyAi(target: EditTarget, result: AiResult, speak: Boolean) {
@@ -451,28 +484,21 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
                 if (speak) speaker.speak(result.text.take(280), settings)
                 refreshSuggestions()
             }
-            is AiResult.Unavailable -> showStatus(result.message)
+            is AiResult.Unavailable -> showAiProblem(result.message)
         }
     }
 
-    private fun translationPair(): Pair<KeyboardLanguage, KeyboardLanguage> {
-        val active = settings.language
-        return if (active == KeyboardLanguage.ENGLISH) {
-            val preferred = settings.serwaaLanguage.takeIf { it != KeyboardLanguage.ENGLISH } ?: KeyboardLanguage.ASANTE
-            KeyboardLanguage.ENGLISH to preferred
-        } else {
-            active to KeyboardLanguage.ENGLISH
-        }
+    private fun showAiProblem(message: String) {
+        showStatus(message)
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
     private fun aiUnavailable(): String? {
         if (!settings.aiEnabled) return "Turn on AI in O24 Keyboard settings to rewrite and translate."
-        if (settings.aiKey.isBlank()) return "Set an AI key in O24 Keyboard settings to use this."
-        if (settings.aiEndpoint.isBlank()) return "Add an AI endpoint in O24 Keyboard settings to use this."
         return null
     }
 
-    private fun client() = AiClient(settings.aiEndpoint, settings.aiKey, settings.aiModel)
+    private fun client() = AiClient(settings)
 
     private fun captureTarget(): EditTarget? {
         val ic = currentInputConnection ?: return null

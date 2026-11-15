@@ -37,14 +37,9 @@ class SettingsStore(context: Context) {
             greeting = prefs.getString(KEY_GREETING, "").orEmpty(),
             serwaaLanguage = KeyboardLanguage.fromCode(prefs.getString(KEY_SERWAA_LANG, null)),
             aiEndpoint = prefs.getString(KEY_AI_ENDPOINT, "").orEmpty().trim(),
-            aiModel = prefs.getString(KEY_AI_MODEL, "").orEmpty().trim().ifBlank { "gpt-4o-mini" },
+            aiModel = prefs.getString(KEY_AI_MODEL, "").orEmpty().trim(),
             aiKey = prefs.getString(KEY_AI_KEY, "").orEmpty().trim(),
-            aiEnabled = if (prefs.contains(KEY_AI_ENABLED)) {
-                prefs.getBoolean(KEY_AI_ENABLED, false)
-            } else {
-                prefs.getString(KEY_AI_KEY, "").orEmpty().isNotBlank() &&
-                    prefs.getString(KEY_AI_ENDPOINT, "").orEmpty().isNotBlank()
-            },
+            aiEnabled = prefs.getBoolean(KEY_AI_ENABLED, true),
             ttsEndpoint = prefs.getString(KEY_TTS_ENDPOINT, "").orEmpty().trim(),
             ttsKey = prefs.getString(KEY_TTS_KEY, "").orEmpty().trim(),
         )

@@ -20,6 +20,7 @@ class AboutActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#0C0A07"))
             addView(slideBackButton(this@AboutActivity) { finish() })
             addView(slideBody(this@AboutActivity, "O24 Keyboard, also called Otumfour, is made in honour of the Asantehene. It is not a publication of Manhyia Palace."))
+            addView(slideBody(this@AboutActivity, getString(R.string.ai_about)))
             val credit = slideBody(this@AboutActivity, getString(R.string.photo_credit))
             credit.setTextColor(Color.parseColor("#E8B52D"))
             credit.paint.isUnderlineText = true
