@@ -1,7 +1,10 @@
 package gh.otumfour.o24.ui
 
 import android.content.Intent
+import android.database.ContentObserver
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -17,6 +20,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.R
 import gh.otumfour.o24.data.SettingsStore
+import gh.otumfour.o24.ime.O24InputMethodService
 
 /** Welcome, enable, choose the keyboard, pick a theme, then finish. */
 class OnboardingActivity : AppCompatActivity() {
@@ -28,10 +32,18 @@ class OnboardingActivity : AppCompatActivity() {
     private lateinit var backButton: android.widget.Button
     private var enableStatus: TextView? = null
     private var pickStatus: TextView? = null
-    private var movingForward = true
-    private var enableKnown = false
-    private var pickKnown = false
+    private var movingForward = false
+    private var sawEnabled = false
+    private var sawDefault = false
     private var freezeAdvance = false
+    private var pickerRequested = false
+    private var persistPage = false
+    private val serviceClass = O24InputMethodService::class.java.name
+    private val imeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            refreshIme()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         prepareEdgeToEdge()
@@ -44,11 +56,12 @@ class OnboardingActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = goBack()
         })
-        val start = OnboardingRouter.resumePage(
+        val base = OnboardingRouter.resumePage(
             stored = store.onboardingPage(),
             requested = if (intent.hasExtra(EXTRA_PAGE)) intent.getIntExtra(EXTRA_PAGE, 0) else null,
             restored = savedInstanceState?.getInt(STATE_PAGE),
         )
+        val start = OnboardingRouter.forwardStep(base, keyboardEnabled(), keyboardSelected(), allowAuto = true)
         installUi(start)
     }
 
@@ -65,14 +78,37 @@ class OnboardingActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    override fun onStart() {
+        super.onStart()
+        runCatching {
+            contentResolver.registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.DEFAULT_INPUT_METHOD),
+                false,
+                imeObserver,
+            )
+            contentResolver.registerContentObserver(
+                Settings.Secure.getUriFor(Settings.Secure.ENABLED_INPUT_METHODS),
+                false,
+                imeObserver,
+            )
+        }
+    }
+
+    override fun onStop() {
+        runCatching { contentResolver.unregisterContentObserver(imeObserver) }
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
-        maybeAdvance()
+        refreshIme()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) maybeAdvance()
+        if (!hasFocus) return
+        refreshIme()
+        if (pickerRequested) window.decorView.post { showPickerIfFocused() }
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -120,9 +156,10 @@ class OnboardingActivity : AppCompatActivity() {
         root.addView(row)
         setContentView(root)
         root.applySystemBarInsets()
+        persistPage = false
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
-                SettingsStore(this@OnboardingActivity).setOnboardingPage(position)
+                if (persistPage) SettingsStore(this@OnboardingActivity).setOnboardingPage(position)
                 bindChrome(position)
                 maybeAdvance()
             }
@@ -130,7 +167,9 @@ class OnboardingActivity : AppCompatActivity() {
         pager.post {
             (pager.getChildAt(0) as? RecyclerView)?.setBackgroundColor(o24Color(O24Color.BG))
             pager.setCurrentItem(page, false)
-            bindChrome(page)
+            persistPage = true
+            SettingsStore(this).setOnboardingPage(pager.currentItem)
+            bindChrome(pager.currentItem)
         }
     }
 
@@ -149,18 +188,34 @@ class OnboardingActivity : AppCompatActivity() {
             primaryParams.weight = 1f
         }
         primary.layoutParams = primaryParams
+        primary.isEnabled = true
+        backButton.isEnabled = true
         primary.text = when (position) {
             0 -> getString(R.string.welcome_continue)
             PAGE_COUNT - 1 -> getString(R.string.slide_finish)
             else -> getString(R.string.slide_next)
         }
-        enableStatus?.text = if (keyboardEnabled()) getString(R.string.step_done_check) else ""
-        pickStatus?.text = if (keyboardSelected()) getString(R.string.step_done_check) else ""
+        enableStatus?.text = if (keyboardEnabled()) {
+            getString(R.string.step_done_check)
+        } else {
+            getString(R.string.enable_not_yet)
+        }
+        pickStatus?.text = if (keyboardSelected()) {
+            getString(R.string.step_done_check)
+        } else {
+            getString(R.string.choose_not_yet)
+        }
+    }
+
+    private fun refreshIme() {
+        if (!::pager.isInitialized || !::primary.isInitialized) return
+        bindChrome(pager.currentItem)
+        maybeAdvance()
     }
 
     private fun goBack() {
         movingForward = false
-        if (pager.currentItem > 0) pager.currentItem = pager.currentItem - 1 else finish()
+        if (pager.currentItem > 0) pager.setCurrentItem(pager.currentItem - 1, true) else finish()
     }
 
     private fun advance() {
@@ -185,56 +240,139 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun maybeAdvance() {
-        if (!::pager.isInitialized || freezeAdvance) return
-        val page = pager.currentItem
-        if (page == 1) {
-            val enabled = keyboardEnabled()
-            if (enabled) {
-                enableStatus?.text = getString(R.string.step_done_check)
-                val became = !enableKnown
-                enableKnown = true
-                if (movingForward || became) {
-                    movingForward = true
-                    pager.post { if (pager.currentItem == 1) pager.setCurrentItem(2, true) }
-                }
-            } else {
-                enableKnown = false
-            }
-        }
-        if (page == 2) {
-            val selected = keyboardSelected()
-            if (selected) {
-                pickStatus?.text = getString(R.string.step_done_check)
-                val became = !pickKnown
-                pickKnown = true
-                if (movingForward || became) {
-                    movingForward = true
-                    pager.post { if (pager.currentItem == 2) pager.setCurrentItem(3, true) }
-                }
-            } else {
-                pickKnown = false
+        if (!::pager.isInitialized || freezeAdvance || !persistPage) return
+        val enabled = keyboardEnabled()
+        val selected = keyboardSelected()
+        val rose = (enabled && !sawEnabled) || (selected && !sawDefault)
+        sawEnabled = enabled
+        sawDefault = selected
+        val next = OnboardingRouter.forwardStep(
+            pager.currentItem,
+            enabled,
+            selected,
+            allowAuto = movingForward || rose,
+        )
+        if (next > pager.currentItem) {
+            movingForward = true
+            val target = next
+            pager.post {
+                if (::pager.isInitialized && pager.currentItem < target) pager.setCurrentItem(target, true)
             }
         }
     }
 
     private fun keyboardEnabled(): Boolean {
+        val listed = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
+        if (ImeMatch.listContains(listed, packageName, serviceClass)) return true
         val imm = getSystemService(InputMethodManager::class.java) ?: return false
-        return imm.enabledInputMethodList.any { it.packageName == packageName }
+        return imm.enabledInputMethodList.any { info ->
+            info.packageName == packageName || ImeMatch.isOurs(info.id, packageName, serviceClass)
+        }
     }
 
     private fun keyboardSelected(): Boolean {
-        val id = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD) ?: return false
-        return id.startsWith(packageName)
+        val id = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        return ImeMatch.isOurs(id, packageName, serviceClass)
     }
 
     private fun openEnable() {
+        SettingsStore(this).setOnboardingPage(OnboardingRouter.ENABLE_PAGE)
         Toast.makeText(this, getString(R.string.hint_enable), Toast.LENGTH_LONG).show()
-        startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+        startInputSettings()
     }
 
+    /** The picker is ignored on Android 12+ unless this window currently has focus. */
     private fun openPicker() {
-        Toast.makeText(this, getString(R.string.hint_choose), Toast.LENGTH_LONG).show()
-        getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
+        SettingsStore(this).setOnboardingPage(OnboardingRouter.CHOOSE_PAGE)
+        pickerRequested = true
+        window.decorView.post { showPickerIfFocused() }
+    }
+
+    private fun showPickerIfFocused() {
+        if (!pickerRequested) return
+        if (!hasWindowFocus()) return
+        if (::pager.isInitialized && pager.currentItem != 2) {
+            pickerRequested = false
+            return
+        }
+        pickerRequested = false
+        val shown = runCatching {
+            getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
+        }.isSuccess
+        if (!shown) pickStatus?.text = getString(R.string.choose_picker_missed)
+    }
+
+    private fun openKeyboardSettings() {
+        SettingsStore(this).setOnboardingPage(OnboardingRouter.CHOOSE_PAGE)
+        startInputSettings()
+    }
+
+    private fun startInputSettings() {
+        val opened = runCatching {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+        }.isSuccess
+        if (!opened) {
+            Toast.makeText(this, getString(R.string.choose_samsung), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun choosePage(): View {
+        val frame = PatternFrame(this)
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+        }
+        column.addView(titleText(this, getString(R.string.slide_pick_title)))
+        val card = o24Card(this) {
+            addView(bodyText(this@OnboardingActivity, getString(R.string.hint_choose)))
+            addView(mutedText(this@OnboardingActivity, getString(R.string.choose_samsung)).apply {
+                setPadding(0, dp(10), 0, 0)
+            })
+            addView(mutedText(this@OnboardingActivity, getString(R.string.choose_huawei)).apply {
+                setPadding(0, dp(6), 0, 0)
+            })
+            val status = mutedText(this@OnboardingActivity, getString(R.string.choose_not_yet))
+            status.setTextColor(o24Color(O24Color.GOLD))
+            status.setPadding(0, dp(10), 0, 0)
+            pickStatus = status
+            addView(status)
+        }
+        column.addView(card, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(8) })
+        column.addView(goldPill(this, getString(R.string.choose_o24), ::openPicker), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(12) })
+        column.addView(outlinePill(this, getString(R.string.choose_fallback), ::openKeyboardSettings), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(8) })
+        column.addView(outlinePill(this, getString(R.string.choose_skip_step)) {
+            movingForward = true
+            if (::pager.isInitialized && pager.currentItem < PAGE_COUNT - 1) {
+                pager.currentItem = pager.currentItem + 1
+            }
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = dp(8) })
+        val scroll = android.widget.ScrollView(this).apply { isFillViewport = true }
+        val center = CenterFrame(this)
+        center.addView(column, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+        ))
+        scroll.addView(center, ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        ))
+        frame.addView(scroll, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
+        ))
+        return frame
     }
 
     private fun welcomePage(): View {
@@ -331,13 +469,7 @@ class OnboardingActivity : AppCompatActivity() {
                     { enableStatus = it },
                     ::openEnable,
                 )
-                2 -> guidePage(
-                    getString(R.string.slide_pick_title),
-                    getString(R.string.hint_choose),
-                    getString(R.string.onboarding_choose_button),
-                    { pickStatus = it },
-                    ::openPicker,
-                )
+                2 -> choosePage()
                 3 -> ThemeCarouselView(this@OnboardingActivity).apply {
                     onReadHistory = { showThemeHistory(it) }
                     val requested = intent.getIntExtra(MainActivity.EXTRA_THEME, -1)

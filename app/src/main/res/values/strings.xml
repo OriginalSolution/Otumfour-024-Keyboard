@@ -24,7 +24,15 @@
     <string name="step_of">Step %1$d of %2$d</string>
     <string name="swipe_hint">Swipe sideways, or use Next and Back.</string>
     <string name="hint_enable">Turn on O24 Keyboard, then tap OK.</string>
-    <string name="hint_choose">Tap O24 Keyboard in the list.</string>
+    <string name="hint_choose">Tap Choose O24, then tap O24 Keyboard in the list. You can tap Next if the list does not appear.</string>
+    <string name="choose_o24">Choose O24</string>
+    <string name="choose_fallback">Open default keyboard settings</string>
+    <string name="choose_skip_step">Skip this step</string>
+    <string name="choose_not_yet">O24 is not the default keyboard yet. Next still works.</string>
+    <string name="choose_picker_missed">If no list appeared, tap Open keyboard settings.</string>
+    <string name="choose_samsung">Samsung: Settings, General management, Keyboard list and default, Default keyboard.</string>
+    <string name="choose_huawei">Huawei: Settings, System &amp; updates, Language &amp; input, Default keyboard.</string>
+    <string name="enable_not_yet">If O24 is already on, tap Next.</string>
     <string name="step_done_check">Done. This step is complete.</string>
     <string name="done_theme_note">The theme you picked is saved. You can change it any time.</string>
     <string name="done_language_note">English and the Ghanaian languages you leave on appear in the language pill.</string>
