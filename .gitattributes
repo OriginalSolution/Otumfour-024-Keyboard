@@ -1,3 +1,4 @@
 *.jks binary
+*.jpg binary
 *.keystore binary
 gradle/wrapper/gradle-wrapper.jar binary

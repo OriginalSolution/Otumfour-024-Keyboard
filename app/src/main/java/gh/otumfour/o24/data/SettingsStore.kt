@@ -15,6 +15,7 @@ data class O24Settings(
     val aiEndpoint: String,
     val aiModel: String,
     val aiKey: String,
+    val aiEnabled: Boolean,
     val ttsEndpoint: String,
     val ttsKey: String,
 )
@@ -38,6 +39,12 @@ class SettingsStore(context: Context) {
             aiEndpoint = prefs.getString(KEY_AI_ENDPOINT, "").orEmpty().trim(),
             aiModel = prefs.getString(KEY_AI_MODEL, "").orEmpty().trim().ifBlank { "gpt-4o-mini" },
             aiKey = prefs.getString(KEY_AI_KEY, "").orEmpty().trim(),
+            aiEnabled = if (prefs.contains(KEY_AI_ENABLED)) {
+                prefs.getBoolean(KEY_AI_ENABLED, false)
+            } else {
+                prefs.getString(KEY_AI_KEY, "").orEmpty().isNotBlank() &&
+                    prefs.getString(KEY_AI_ENDPOINT, "").orEmpty().isNotBlank()
+            },
             ttsEndpoint = prefs.getString(KEY_TTS_ENDPOINT, "").orEmpty().trim(),
             ttsKey = prefs.getString(KEY_TTS_KEY, "").orEmpty().trim(),
         )
@@ -63,6 +70,7 @@ class SettingsStore(context: Context) {
             .putString(KEY_AI_ENDPOINT, next.aiEndpoint)
             .putString(KEY_AI_MODEL, next.aiModel)
             .putString(KEY_AI_KEY, next.aiKey)
+            .putBoolean(KEY_AI_ENABLED, next.aiEnabled)
             .putString(KEY_TTS_ENDPOINT, next.ttsEndpoint)
             .putString(KEY_TTS_KEY, next.ttsKey)
             .apply()
@@ -88,6 +96,7 @@ class SettingsStore(context: Context) {
         const val KEY_AI_ENDPOINT = "ai_endpoint"
         const val KEY_AI_MODEL = "ai_model"
         const val KEY_AI_KEY = "ai_key"
+        const val KEY_AI_ENABLED = "ai_enabled"
         const val KEY_TTS_ENDPOINT = "tts_endpoint"
         const val KEY_TTS_KEY = "tts_key"
         const val KEY_ONBOARDED = "onboarded"
