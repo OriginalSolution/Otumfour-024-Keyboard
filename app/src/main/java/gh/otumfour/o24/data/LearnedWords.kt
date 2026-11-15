@@ -33,6 +33,20 @@ class LearnedWords(context: Context) {
         dir.listFiles()?.forEach { it.delete() }
     }
 
+    fun forget(language: String, word: String) = synchronized(lock) {
+        val current = load(language).toMutableMap()
+        current.remove(word.trim().lowercase())
+        if (current.isEmpty()) file(language).delete() else write(language, current)
+    }
+
+    fun entries(): List<LearnedEntry> = synchronized(lock) {
+        val files = dir.listFiles()?.filter { it.isFile } ?: return emptyList()
+        files.flatMap { file ->
+            val language = file.nameWithoutExtension
+            load(language).map { (word, count) -> LearnedEntry(language, word, count) }
+        }.sortedWith(compareBy({ it.language }, { it.word }))
+    }
+
     private fun write(language: String, words: Map<String, Int>) {
         val file = file(language)
         file.parentFile?.mkdirs()
@@ -41,3 +55,5 @@ class LearnedWords(context: Context) {
 
     private fun file(language: String) = File(dir, language.replace(Regex("[^a-z0-9-]"), "_") + ".txt")
 }
+
+data class LearnedEntry(val language: String, val word: String, val count: Int)

@@ -1,9 +1,7 @@
 package gh.otumfour.o24.ime
 
-import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -19,16 +17,13 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import gh.otumfour.o24.ai.AiClient
 import gh.otumfour.o24.ai.AiResult
 import gh.otumfour.o24.data.LearnedWords
 import gh.otumfour.o24.data.O24Settings
 import gh.otumfour.o24.data.SettingsStore
 import gh.otumfour.o24.lang.KeyboardLanguage
-import gh.otumfour.o24.serwaa.SerwaaPersona
-import gh.otumfour.o24.serwaa.SerwaaSpeaker
-import gh.otumfour.o24.serwaa.VoiceTyper
+import gh.otumfour.o24.suggest.Autocorrect
 import gh.otumfour.o24.suggest.Lexicon
 import gh.otumfour.o24.suggest.Suggestion
 import gh.otumfour.o24.theme.ThemeId
@@ -45,8 +40,6 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var store: SettingsStore
     private lateinit var learned: LearnedWords
-    private lateinit var speaker: SerwaaSpeaker
-    private lateinit var voice: VoiceTyper
 
     private val lexicons = HashMap<String, Lexicon>()
     private var settings: O24Settings = O24Settings(
@@ -54,15 +47,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         language = KeyboardLanguage.ENGLISH,
         enabledLanguages = KeyboardLanguage.entries.toList(),
         autocorrect = true,
-        userName = "",
-        greeting = "",
-        serwaaLanguage = KeyboardLanguage.ENGLISH,
+        autoCapitalise = true,
+        haptic = true,
+        keySound = false,
         aiEndpoint = "",
-        aiModel = "gpt-4o-mini",
+        aiModel = "",
         aiKey = "",
-        aiEnabled = false,
-        ttsEndpoint = "",
-        ttsKey = "",
+        aiEnabled = true,
     )
 
     private var page = BoardPage.LETTERS
@@ -71,24 +62,24 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private var suppressSuggest = false
     private var ranked: List<Suggestion> = emptyList()
     private var shown: List<Suggestion?> = listOf(null, null, null)
-    private var listening = false
-
     private var root: LinearLayout? = null
     private var keyboard: KeyboardView? = null
     private var suggestionViews: List<TextView> = emptyList()
     private var statusView: TextView? = null
     private var toneRow: LinearLayout? = null
     private var languageButton: Button? = null
-    private var serwaaButton: Button? = null
     private var popup: PopupWindow? = null
+    private var undo: Undo? = null
+    private val rejected = HashSet<String>()
+    private var lastChar = ""
+    private var lastCharAt = 0L
 
     override fun onCreate() {
         super.onCreate()
         store = SettingsStore(this)
         learned = LearnedWords(this)
-        speaker = SerwaaSpeaker(this)
-        voice = VoiceTyper(this, onState = { showStatus(it) }, onText = { commitVoice(it) })
         settings = store.get()
+        window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
         getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
             .registerOnSharedPreferenceChangeListener(this)
     }
@@ -96,8 +87,6 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     override fun onDestroy() {
         getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
             .unregisterOnSharedPreferenceChangeListener(this)
-        voice.stop()
-        speaker.shutdown()
         scope.cancel()
         super.onDestroy()
     }
@@ -114,16 +103,32 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         suppressSuggest = isPassword(info) || isNumber(info)
         page = if (isNumber(info)) BoardPage.SYMBOLS else BoardPage.LETTERS
         shift = if (wantsCaps(info)) ShiftState.ONCE else ShiftState.OFF
-        listening = false
+        undo = null
+        rejected.clear()
         reloadKeyboard()
         refreshSuggestions()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        voice.stop()
-        speaker.stop()
         popup?.dismiss()
         super.onFinishInputView(finishingInput)
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        keyboard?.requestLayout()
+    }
+
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        val view = root ?: return
+        if (view.height == 0) return
+        val location = IntArray(2)
+        view.getLocationInWindow(location)
+        val top = location[1].coerceAtLeast(0)
+        outInsets.contentTopInsets = top
+        outInsets.visibleTopInsets = top
+        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_CONTENT
     }
 
     override fun onCreateInputView(): View {
@@ -188,15 +193,6 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             toolbar.addView(button)
         }
         toolbar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        serwaaButton = pill("Serwaa").also { button ->
-            button.setOnClickListener { onSerwaaTap() }
-            button.setOnLongClickListener {
-                speaker.speak(SerwaaPersona.greeting(settings.userName, settings.greeting), settings)
-                showStatus(SerwaaPersona.greeting(settings.userName, settings.greeting))
-                true
-            }
-            toolbar.addView(button, marginStart())
-        }
         toolbar.addView(pill("AI").also { it.setOnClickListener { onAi() } }, marginStart())
         toolbar.addView(pill("Translate").also { it.setOnClickListener { onTranslate() } }, marginStart())
         toolbar.addView(pill("⚙").also { it.setOnClickListener { openSettings() } }, marginStart())
@@ -209,8 +205,9 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         )
 
         keyboard = KeyboardView(this).also { board ->
-            board.onKey = { key -> onKey(key) }
-            board.onAlternate = { key -> onAlternate(key) }
+        board.onKey = { key -> onKey(key) }
+        board.onAlternate = { key -> onAlternate(key) }
+        board.hapticEnabled = settings.haptic
             column.addView(board, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
         reloadKeyboard()
@@ -222,6 +219,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val colors = colorsFor(settings.theme)
         board.theme = settings.theme
         board.colors = colors
+        board.hapticEnabled = settings.haptic
+        board.soundEnabled = settings.keySound
         board.rows = KeyboardModel.rows(page, settings.language, shift, enterLabel, colors.spaceTitle)
         root?.setBackgroundColor(colors.keyboardBg)
         suggestionViews.forEach {
@@ -237,11 +236,10 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private fun styleToolbar() {
         val colors = colorsFor(settings.theme)
         languageButton?.let { stylePill(it, colors.pillFill, colors.pillText, glow = false) }
-        serwaaButton?.let { stylePill(it, colors.micFill, colors.micLabel, glow = settings.theme == ThemeId.GOLDEN_STOOL) }
-        val parent = serwaaButton?.parent as? LinearLayout ?: return
+        val parent = languageButton?.parent as? LinearLayout ?: return
         for (i in 0 until parent.childCount) {
             val child = parent.getChildAt(i)
-            if (child is Button && child !== languageButton && child !== serwaaButton) {
+            if (child is Button && child !== languageButton) {
                 stylePill(child, colors.actionFill, colors.actionLabel, glow = false)
             }
         }
@@ -251,13 +249,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private fun onKey(key: KeySpec) {
         val ic = currentInputConnection ?: return
         when (key.action) {
-            KeyAction.CHAR -> {
-                if (key.value.isEmpty()) return
-                ic.commitText(key.value, 1)
-                if (shift == ShiftState.ONCE && key.value.any { it.isLetter() }) shift = ShiftState.OFF
-                reloadKeyboard()
-                refreshSuggestions()
-            }
+            KeyAction.CHAR -> commitChar(ic, key.value)
             KeyAction.SHIFT -> {
                 if (page != BoardPage.LETTERS) return
                 shift = when (shift) {
@@ -268,7 +260,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
                 reloadKeyboard()
             }
             KeyAction.BACKSPACE -> {
-                deleteBackward(ic)
+                if (!revertCorrection(ic)) deleteBackward(ic)
                 refreshSuggestions()
             }
             KeyAction.ENTER -> {
@@ -305,24 +297,80 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         }
     }
 
+    private fun commitChar(ic: InputConnection, value: String) {
+        if (value.isEmpty()) return
+        val now = android.os.SystemClock.uptimeMillis()
+        if (value == lastChar && now - lastCharAt < 40L && value.length == 1 && value[0].isLetter()) return
+        lastChar = value
+        lastCharAt = now
+        undo = null
+        if (value.length == 1 && value[0] in ".!?,") {
+            correctCurrentWord(ic, trailing = value)
+            if (settings.autoCapitalise && value[0] in ".!?") shift = ShiftState.ONCE
+        } else {
+            ic.commitText(value, 1)
+            if (shift == ShiftState.ONCE && value.any { it.isLetter() }) shift = ShiftState.OFF
+        }
+        reloadKeyboard()
+        refreshSuggestions()
+    }
+
     private fun commitSpace(ic: InputConnection) {
+        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+        if (before == " ") return
         val word = currentWord()
-        if (!suppressSuggest && settings.autocorrect && word.length >= 3) {
-            val choice = Lexicon.autocorrect(word, ranked)
-            if (choice != null) {
-                ic.deleteSurroundingText(word.length, 0)
-                val written = Lexicon.matchCase(word, choice)
-                ic.commitText("$written ", 1)
-                learned.learn(settings.language.code, written)
-                finishWord()
-                return
-            }
+        if (settings.autoCapitalise && word == "i") {
+            ic.deleteSurroundingText(1, 0)
+            ic.commitText("I ", 1)
+            finishWord()
+            return
         }
-        if (!suppressSuggest && word.length >= 3 && !lexicon(settings.language).contains(word)) {
-            learned.learn(settings.language.code, word)
-        }
-        ic.commitText(" ", 1)
+        correctCurrentWord(ic, trailing = " ")
         finishWord()
+    }
+
+    private fun correctCurrentWord(ic: InputConnection, trailing: String) {
+        val word = currentWord()
+        val known = wordIsKnown(word)
+        val choice = if (!suppressSuggest && settings.autocorrect) {
+            Lexicon.autocorrect(word, ranked, known, rejected)
+        } else {
+            null
+        }
+        if (choice != null) {
+            ic.deleteSurroundingText(word.length, 0)
+            val written = Lexicon.matchCase(word, choice)
+            ic.commitText(written + trailing, 1)
+            undo = Undo(word, written)
+            learned.learn(settings.language.code, written)
+        } else {
+            if (!suppressSuggest && word.length >= 3 && !known) learned.learn(settings.language.code, word)
+            ic.commitText(trailing, 1)
+            undo = null
+        }
+    }
+
+    private fun wordIsKnown(word: String): Boolean {
+        if (word.isEmpty()) return false
+        val learnedWords = learned.load(settings.language.code)
+        if (word.lowercase() in learnedWords) return true
+        return settings.enabledLanguages.any { lexicon(it).contains(word) }
+    }
+
+    private fun revertCorrection(ic: InputConnection): Boolean {
+        val pending = undo ?: return false
+        val before = ic.getTextBeforeCursor(pending.replacement.length + 1, 0)?.toString().orEmpty()
+        val withSpace = pending.replacement + " "
+        val count = when {
+            before.endsWith(withSpace) -> withSpace.length
+            before.endsWith(pending.replacement) -> pending.replacement.length
+            else -> return false
+        }
+        ic.deleteSurroundingText(count, 0)
+        ic.commitText(pending.original, 1)
+        rejected.add(pending.original.lowercase())
+        undo = null
+        return true
     }
 
     private fun finishWord() {
@@ -350,36 +398,6 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         ic.deleteSurroundingText(count.coerceAtLeast(1), 0)
     }
 
-    private fun commitVoice(text: String) {
-        listening = false
-        serwaaButton?.text = "Serwaa"
-        val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        val gap = if (before.isNotEmpty() && !before.last().isWhitespace()) " " else ""
-        ic.commitText(gap + text, 1)
-        showStatus("Serwaa typed that.")
-        refreshSuggestions()
-    }
-
-    private fun onSerwaaTap() {
-        if (listening) {
-            voice.stop()
-            listening = false
-            serwaaButton?.text = "Serwaa"
-            showStatus("Serwaa stopped.")
-            return
-        }
-        val allowed = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (!allowed) {
-            showStatus("Allow the microphone in O24 Keyboard settings, then tap Serwaa again.")
-            openSettings()
-            return
-        }
-        listening = true
-        serwaaButton?.text = "Listening"
-        voice.start(settings.serwaaLanguage.speechTag)
-    }
-
     private fun onAi() {
         if (suppressSuggest) {
             showStatus("Rewrite stays off on password and number fields.")
@@ -387,7 +405,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         }
         val target = captureTarget()
         if (target == null) {
-            showStatus("Type or select something for Serwaa to rewrite.")
+            showStatus("Type or select something to rewrite.")
             return
         }
         aiUnavailable()?.let {
@@ -446,7 +464,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         showStatus("Rewriting…")
         scope.launch {
             val result = withContext(Dispatchers.IO) { client().rewrite(target.text, style) }
-            applyAi(target, result, speak = true)
+            applyAi(target, result)
         }
     }
 
@@ -455,7 +473,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         showStatus("Translating…")
         scope.launch {
             val result = withContext(Dispatchers.IO) { client().translate(text, targetName) }
-            applyAi(target, result, speak = true)
+            applyAi(target, result)
         }
     }
 
@@ -466,7 +484,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         }
         val target = captureTarget()
         if (target == null) {
-            showStatus("Type or select something for Serwaa to translate.")
+            showStatus("Type or select something to translate.")
             return
         }
         aiUnavailable()?.let {
@@ -476,12 +494,11 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         showLanguages(target.text)
     }
 
-    private fun applyAi(target: EditTarget, result: AiResult, speak: Boolean) {
+    private fun applyAi(target: EditTarget, result: AiResult) {
         when (result) {
             is AiResult.Ok -> {
                 replace(target, result.text)
                 showStatus(result.text)
-                if (speak) speaker.speak(result.text.take(280), settings)
                 refreshSuggestions()
             }
             is AiResult.Unavailable -> showAiProblem(result.message)
@@ -538,11 +555,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             return
         }
         ranked = lexicon(settings.language).suggest(word, learned.load(settings.language.code))
-        shown = listOf(ranked.getOrNull(1), ranked.getOrNull(0), ranked.getOrNull(2))
+        shown = Autocorrect.display(word, ranked).map { suggestion ->
+            suggestion?.copy(word = Lexicon.matchCase(word, suggestion.word))
+        }
         suggestionViews.forEachIndexed { index, view ->
-            val suggestion = shown[index]
-            view.text = suggestion?.let { Lexicon.matchCase(word, it.word) }.orEmpty()
-            view.setTypeface(null, if (index == 1) Typeface.BOLD else Typeface.NORMAL)
+            val suggestion = shown.getOrNull(index)
+            view.text = suggestion?.word.orEmpty()
+            view.setTypeface(null, if (index == 0 && suggestion != null) Typeface.BOLD else Typeface.NORMAL)
         }
     }
 
@@ -650,17 +669,24 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     private fun wantsCaps(info: EditorInfo?): Boolean {
+        if (!settings.autoCapitalise) return false
         val ic = currentInputConnection ?: return false
         val type = info?.inputType ?: return false
         return ic.getCursorCapsMode(type) != 0
     }
 
     private fun isPassword(info: EditorInfo?): Boolean {
-        val variation = info?.inputType?.and(InputType.TYPE_MASK_VARIATION) ?: return false
-        return variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+        val type = info?.inputType ?: return false
+        val variation = type and InputType.TYPE_MASK_VARIATION
+        val noSuggestions = (type and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
+        val variationIsPassword = variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
             variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
             variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
-            variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+            variation == InputType.TYPE_TEXT_VARIATION_URI
+        return noSuggestions || variationIsPassword
     }
 
     private fun isNumber(info: EditorInfo?): Boolean {
@@ -681,4 +707,5 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     ).apply { marginStart = dp(6) }
 
     private data class EditTarget(val selected: Boolean, val before: Int, val after: Int, val text: String)
+    private data class Undo(val original: String, val replacement: String)
 }

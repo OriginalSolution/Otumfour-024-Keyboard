@@ -2,6 +2,7 @@ package gh.otumfour.o24.ime
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.media.AudioManager
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -46,6 +47,8 @@ class KeyboardView @JvmOverloads constructor(
 
     var onKey: (KeySpec) -> Unit = {}
     var onAlternate: (KeySpec) -> Unit = {}
+    var hapticEnabled: Boolean = true
+    var soundEnabled: Boolean = false
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -137,11 +140,12 @@ class KeyboardView @JvmOverloads constructor(
             }
             label.color = fg
             label.isFakeBoldText = themeColors.boldLetters
-            label.textSize = when {
+            val wanted = when {
                 key.role == KeySpec.Role.SPACE -> dp(13f)
                 key.label.length > 2 -> dp(13f)
                 else -> dp(18f)
             }
+            label.textSize = min(wanted, rect.height() * 0.46f)
             val baseline = rect.centerY() - (label.descent() + label.ascent()) / 2f
             canvas.drawText(key.label, rect.centerX(), baseline, label)
         }
@@ -162,7 +166,11 @@ class KeyboardView @JvmOverloads constructor(
                 } else if (key.alternate != null) {
                     handler.postDelayed(longRunnable, 380L)
                 }
-                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                if (hapticEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                if (soundEnabled) {
+                    context.getSystemService(AudioManager::class.java)
+                        ?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, 0.35f)
+                }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
@@ -246,19 +254,48 @@ class KeyboardView @JvmOverloads constructor(
         val gap = dp(5f)
         val pad = dp(4f)
         val topExtra = if (theme == ThemeId.ROYAL_CREST) dp(14f) else 0f
-        val rowH = (height - pad * 2 - topExtra - gap * (rows.size - 1)) / rows.size
+        val bottomInset = gestureInset()
+        val usableH = height - pad * 2 - topExtra - bottomInset - gap * (rows.size - 1)
+        val rowH = (usableH / rows.size).coerceAtMost(dp(58f))
+        val cap = keyCap()
+        val split = resources.configuration.screenWidthDp >= 840
         var y = pad + topExtra
         rows.forEachIndexed { index, row ->
-            val weight = row.sumOf { it.weight.toDouble() }.toFloat()
-            var x = pad
+            val weight = row.sumOf { it.weight.toDouble() }.toFloat().coerceAtLeast(1f)
             val inner = width - pad * 2 - gap * (row.size - 1)
-            for (key in row) {
-                val w = inner * (key.weight / weight)
+            val widths = row.map { key -> min(inner * (key.weight / weight), cap) }
+            val splitGap = if (split && row.size >= 6) dp(36f) else 0f
+            val used = widths.sum() + gap * (row.size - 1) + splitGap
+            var x = ((width - used) / 2f).coerceAtLeast(pad)
+            val mid = row.size / 2
+            row.forEachIndexed { keyIndex, key ->
+                if (split && keyIndex == mid) x += splitGap
+                val w = widths[keyIndex]
                 placed.add(Placed(key, RectF(x, y, x + w, y + rowH), index))
                 x += w + gap
             }
             y += rowH + gap
         }
+    }
+
+    private fun keyCap(): Float {
+        val widthDp = resources.configuration.screenWidthDp
+        return when {
+            widthDp >= 600 -> dp(72f)
+            widthDp < 360 -> dp(48f)
+            else -> dp(64f)
+        }
+    }
+
+    private fun gestureInset(): Float {
+        val insets = rootWindowInsets ?: return 0f
+        return insets.systemWindowInsetBottom.toFloat()
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        art = null
+        requestLayout()
     }
 
     private fun hit(x: Float, y: Float): KeySpec? {
@@ -286,9 +323,16 @@ class KeyboardView @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
+        val metrics = resources.displayMetrics
+        val shorter = min(metrics.widthPixels, metrics.heightPixels)
         val rowsCount = rows.size.coerceAtLeast(4)
-        val wanted = (dp(52f) * rowsCount + dp(8f)).toInt()
-        val height = min(wanted, (resources.displayMetrics.heightPixels * 0.46f).toInt())
-        setMeasuredDimension(width, height.coerceAtLeast(dp(180f).toInt()))
+        val narrow = resources.configuration.screenWidthDp < 360
+        val rowMin = dp(if (narrow) 38f else 42f)
+        val rowH = (shorter * 0.078f).coerceIn(rowMin, dp(54f))
+        val wanted = (rowH * rowsCount + dp(10f) + gestureInset()).toInt()
+        val mode = MeasureSpec.getMode(heightMeasureSpec)
+        val spec = MeasureSpec.getSize(heightMeasureSpec)
+        val height = if (mode == MeasureSpec.EXACTLY && spec > 0) spec else wanted
+        setMeasuredDimension(width, height.coerceAtLeast((rowMin * 4).toInt()))
     }
 }

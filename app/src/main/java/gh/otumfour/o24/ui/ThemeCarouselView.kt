@@ -27,7 +27,6 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
     private val store = SettingsStore(context)
     private val pager = ViewPager2(context)
     private val name = TextView(context)
-    private val jersey = TextView(context)
     private val history = TextView(context)
     private val dots = PageDotsView(context)
     private val apply = Button(context)
@@ -36,46 +35,27 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(Color.parseColor("#0C0A07"))
-        val pad = dp(28)
+        setBackgroundColor(Color.TRANSPARENT)
+        addView(kenteRule(context))
+        name.setTextColor(Color.parseColor("#F3D37A"))
+        name.textSize = 22f
+        name.typeface = android.graphics.Typeface.create("serif", android.graphics.Typeface.BOLD)
+        name.gravity = Gravity.CENTER
+        name.setPadding(dp(16), dp(10), dp(16), dp(4))
+        addView(name, matchWrap())
+
+        val pad = dp(18)
         pager.adapter = CardAdapter()
         pager.offscreenPageLimit = 2
         pager.clipToPadding = false
         pager.clipChildren = false
-        pager.setPadding(pad, dp(8), pad, dp(8))
+        pager.setPadding(pad, dp(4), pad, dp(4))
         pager.setPageTransformer { page, position ->
-            val scale = 0.88f + (1f - abs(position).coerceAtMost(1f)) * 0.12f
+            val scale = 0.92f + (1f - abs(position).coerceAtMost(1f)) * 0.08f
             page.scaleY = scale
-            page.alpha = 0.55f + (1f - abs(position).coerceAtMost(1f)) * 0.45f
+            page.alpha = 0.72f + (1f - abs(position).coerceAtMost(1f)) * 0.28f
         }
         addView(pager, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-
-        name.setTextColor(Color.parseColor("#F3D37A"))
-        name.textSize = 26f
-        name.gravity = Gravity.CENTER
-        name.setPadding(dp(16), dp(8), dp(16), 0)
-        addView(name, matchWrap())
-
-        jersey.setTextColor(Color.parseColor("#CDBF98"))
-        jersey.textSize = 12f
-        jersey.gravity = Gravity.CENTER
-        jersey.text = context.getString(R.string.jersey_heading)
-        jersey.visibility = GONE
-        addView(jersey, matchWrap())
-
-        history.setTextColor(Color.parseColor("#F6F1E4"))
-        history.textSize = 14f
-        history.setLineSpacing(dp(2).toFloat(), 1.1f)
-        history.setPadding(dp(20), dp(8), dp(20), dp(4))
-        val historyScroll = ScrollView(context).apply {
-            addView(history)
-            isVerticalScrollBarEnabled = true
-        }
-        addView(historyScroll, LayoutParams(LayoutParams.MATCH_PARENT, dp(108)))
-
-        val read = textButton(context.getString(R.string.learn_more))
-        read.setOnClickListener { onReadHistory(current()) }
-        addView(read, matchWrap())
 
         dots.count = ThemeId.entries.size
         addView(dots, matchWrap())
@@ -91,12 +71,32 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
                 }
                 setOnClickListener { pager.setCurrentItem(index, true) }
             }
-            swatches.addView(dot, LayoutParams(dp(22), dp(22)).apply { marginStart = dp(6); marginEnd = dp(6) })
+            swatches.addView(dot, LayoutParams(dp(18), dp(18)).apply { marginStart = dp(4); marginEnd = dp(4) })
         }
         addView(HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
+            setPadding(dp(12), dp(2), dp(12), dp(2))
             addView(swatches)
         }, matchWrap())
+
+        history.setTextColor(Color.parseColor("#F6F1E4"))
+        history.textSize = 14f
+        history.setLineSpacing(dp(2).toFloat(), 1.12f)
+        val historyCard = o24Card(context) {
+            addView(history)
+            val read = textButton(context.getString(R.string.learn_more))
+            read.setOnClickListener { onReadHistory(current()) }
+            addView(read)
+        }
+        val historyScroll = ScrollView(context).apply {
+            addView(historyCard)
+            isVerticalScrollBarEnabled = true
+        }
+        addView(historyScroll, LayoutParams(LayoutParams.MATCH_PARENT, dp(132)).apply {
+            marginStart = dp(16)
+            marginEnd = dp(16)
+            topMargin = dp(4)
+        })
 
         styleGold(apply)
         apply.setOnClickListener {
@@ -120,16 +120,21 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
 
     fun refresh() = bind(pager.currentItem)
 
+    fun showTheme(index: Int) {
+        val safe = index.coerceIn(0, ThemeId.entries.lastIndex)
+        pager.setCurrentItem(safe, false)
+        bind(safe)
+    }
+
     private fun current(): ThemeId = ThemeId.entries[pager.currentItem]
 
     private fun bind(position: Int) {
         val theme = ThemeId.entries[position]
         name.text = context.getString(theme.titleRes)
-        jersey.visibility = if (theme.jersey) VISIBLE else GONE
         history.text = context.getString(theme.historyRes) + "\n\n" + context.getString(R.string.history_disclaimer)
         dots.selected = position
         val active = store.get().theme == theme
-        apply.text = if (active) context.getString(R.string.theme_in_use) else context.getString(R.string.use_theme)
+        apply.text = if (active) "✓  " + context.getString(R.string.theme_in_use) else context.getString(R.string.use_theme)
         for (i in 0 until swatches.childCount) {
             swatches.getChildAt(i).alpha = if (i == position) 1f else 0.45f
         }
