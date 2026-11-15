@@ -43,8 +43,13 @@ class SettingsStore(context: Context) {
 
     fun isOnboarded(): Boolean = prefs.getBoolean(KEY_ONBOARDED, false)
 
-    fun setOnboarded() {
-        prefs.edit().putBoolean(KEY_ONBOARDED, true).apply()
+    /** Synchronous so the next activity sees the flag before it decides where to go. */
+    fun setOnboarded(): Boolean = prefs.edit().putBoolean(KEY_ONBOARDED, true).commit()
+
+    fun onboardingPage(): Int = prefs.getInt(KEY_ONBOARDING_PAGE, 0)
+
+    fun setOnboardingPage(page: Int) {
+        prefs.edit().putInt(KEY_ONBOARDING_PAGE, page.coerceAtLeast(0)).commit()
     }
 
     fun isDeveloper(): Boolean = prefs.getBoolean(KEY_DEVELOPER, false)
@@ -93,6 +98,7 @@ class SettingsStore(context: Context) {
         const val KEY_AI_KEY = "ai_key"
         const val KEY_AI_ENABLED = "ai_enabled"
         const val KEY_ONBOARDED = "onboarded"
+        const val KEY_ONBOARDING_PAGE = "onboarding_page"
         const val KEY_DEVELOPER = "developer"
     }
 }

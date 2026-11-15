@@ -48,11 +48,17 @@ class MainActivity : AppCompatActivity() {
     private var versionTaps = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
         store = SettingsStore(this)
         val open = intent.getBooleanExtra(EXTRA_OPEN, false)
-        if (!store.isOnboarded() && !intent.getBooleanExtra(EXTRA_AFTER_ONBOARDING, false) && !open) {
-            startActivity(Intent(this, OnboardingActivity::class.java).putExtras(intent))
+        val finished = OnboardingRouter.showSettings(store.isOnboarded()) ||
+            intent.getBooleanExtra(EXTRA_AFTER_ONBOARDING, false)
+        if (!finished && !open) {
+            startActivity(
+                Intent(this, OnboardingActivity::class.java)
+                    .putExtra(OnboardingActivity.EXTRA_PAGE, store.onboardingPage()),
+            )
             finish()
             return
         }
@@ -80,6 +86,7 @@ class MainActivity : AppCompatActivity() {
         section = page
         val shell = if (widthClass() == WidthClass.EXPANDED) twoPane(page) else slideShell(page)
         setContentView(shell)
+        shell.applySystemBarInsets()
     }
 
     private fun slideShell(page: Int): View {
