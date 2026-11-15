@@ -11,9 +11,16 @@ android {
         applicationId = "gh.otumfour.o24"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
         buildConfigField("String", "SERWAA_SOURCE", "\"OriginalSolution/traffitech-gh-alert@cursor/traffialert-gh-v1-4c59\"")
+        buildConfigField("String", "O24_AI_URL", "\"https://ffqchvmcdstxmjsimgdt.supabase.co/functions/v1/o24-ai\"")
+        // Public Supabase anon key for the O24 AI proxy. The OpenAI key stays on the server.
+        buildConfigField(
+            "String",
+            "O24_AI_ANON",
+            "\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmcWNodm1jZHN0eG1qc2ltZ2R0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ3MzA4MTMsImV4cCI6MjExMDMwNjgxM30.VMFl4o-TaJW_Hp0lfwuniCgheS_KoQjS-0BuxPYeAj4\"",
+        )
     }
 
     buildFeatures {

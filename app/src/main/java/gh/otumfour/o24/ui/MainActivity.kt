@@ -207,7 +207,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun aiPage(): View = page {
         val settings = store.get()
-        addView(slideBody(this@MainActivity, getString(R.string.ai_friendly)))
+        addView(slideBody(this@MainActivity, "O24 AI is built in. ${getString(R.string.ai_friendly)}"))
         addView(Switch(this@MainActivity).apply {
             text = getString(R.string.ai_toggle)
             setTextColor(Color.parseColor("#F6F1E4"))
@@ -220,6 +220,7 @@ class MainActivity : AppCompatActivity() {
         val advanced = LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             visibility = View.GONE
+            addView(slideBody(this@MainActivity, getString(R.string.ai_advanced_note)))
             addView(label("Endpoint"))
             addView(endpoint)
             addView(label("Model"))
@@ -235,7 +236,7 @@ class MainActivity : AppCompatActivity() {
             store.update {
                 it.copy(
                     aiEndpoint = endpoint.text.toString().trim(),
-                    aiModel = model.text.toString().trim().ifBlank { "gpt-4o-mini" },
+                    aiModel = model.text.toString().trim(),
                     aiKey = key.text.toString().trim(),
                 )
             }
@@ -259,6 +260,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun LinearLayout.addAbout(activity: AppCompatActivity) {
         addView(slideBody(activity, "O24 Keyboard, also called Otumfour, is made in honour of the Asantehene. It is not a publication of Manhyia Palace."))
+        addView(slideBody(activity, activity.getString(R.string.ai_about)))
         val credit = slideBody(activity, activity.getString(R.string.photo_credit))
         credit.setTextColor(Color.parseColor("#E8B52D"))
         credit.paint.isUnderlineText = true

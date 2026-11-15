@@ -10,7 +10,7 @@ The name Otumfour is a popular spelling of the title Otumfuo. O24 is the short n
 - Ghanaian languages on a switcher pill: English, Asante Twi, Akuapem Twi, Fante, Ga, Ewe, Dagbani, Dagaare, Gonja, Nzema, Kasem, and Hausa as written in Ghana. The extra letter row changes with the language (`ɛ ɔ ŋ ƒ ʋ ɖ ɣ`, and Hausa `ɓ ɗ ƙ ƴ`, with capitals).
 - A suggestion bar with three candidates. Correction uses edit distance and word frequency. Words you accept are remembered on the phone. Seed lists live in `app/src/main/assets/dictionaries/` as `word` or `word<tab>frequency`. Add lines to extend a language. Lines starting with `#` are comments.
 - **Serwaa**, the voice from TraffiAlert GH. Tap the mic to dictate. Hold it to hear a greeting. She speaks replies with the same Android settings as TraffiAlert: British English, rate `0.95`, pitch `1.05`, navigation-guidance audio, and the clearest installed offline voice of the same family. See below.
-- **AI** rewrite (Clear, Formal, Warm, Shorter) and **Translate** between English and the active Ghanaian language. Both use a pluggable OpenAI-compatible endpoint. With no key, the keyboard says so and does not call out.
+- **AI** rewrite (Improve, Formal, Casual, Shorter, Fix spelling) and translate into English, Asante Twi, Akuapem Twi, Fante, Ga, Ewe, Dagbani, Dagaare, Gonja, Nzema, Kasem, or Hausa. This runs through O24's server. No key is stored in the app. Text is sent only when you tap AI or Translate. An optional OpenAI-compatible endpoint under Advanced is used only if the endpoint, model, and key are all filled in.
 - Ten themes, chosen from a swipe carousel in onboarding and again from settings. Jersey Edition is labelled on its own pages. Each theme has a history card. You can switch back to any theme, including Golden Stool Royal. Patterns are original drawings. The welcome slide uses one real photograph: Otumfuo Osei Tutu II in regalia, by Zackagonii, [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Ashanti_King_Otumfour_Osei_Tutu_II.jpg). The app credits that photo on the About page.
 - A settings app: enable the keyboard, pick a theme, choose languages, personalise Serwaa, set AI and optional cloud TTS, and read an About page for Otumfuo.
 
@@ -70,13 +70,11 @@ None of these are required to install or type.
 
 | Setting | Where | Needed for |
 | --- | --- | --- |
-| AI endpoint | In the app (for example `https://api.openai.com/v1`) | Rewrite and translate |
-| AI API key | In the app, stored only on the phone | Rewrite and translate |
-| AI model | In the app, default `gpt-4o-mini` | Rewrite and translate |
+| AI endpoint, model, and key | Optional, under Advanced. Used only if all three are filled in | Your own OpenAI-compatible server instead of O24 AI |
 | Cloud TTS endpoint and key | In the app | Optional recorded-style playback from your own Serwaa service |
 | `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` | GitHub Actions secrets | Optional. Without them the release APK is signed with the committed **test** key (`keystore/o24-test.jks`, password `o24keyboard`, alias `o24`). Do not use that key for Play Store. |
 
-Rewrite and translate send text only after you tap **AI** or **Translate**, and only when both an endpoint and a key are saved. Password fields are skipped.
+Rewrite and translate use O24's server by default. Text is sent only after you tap **AI** or **Translate**, and only up to 2000 characters. Password fields are skipped. The OpenAI key is not in this app.
 
 ## Theme previews
 
@@ -124,5 +122,5 @@ Sideload:
 - The dictionaries are seeds, not full lexicons. Several Ghanaian lists are short and marked for native-speaker review. Suggestions improve as you add lines or as the keyboard learns words.
 - Twi, Ga, Ewe, and most other Ghanaian languages have no reliable Android voice. Serwaa’s spoken replies stay on the TraffiAlert English voice (`en-GB`). Dictation uses `en-GH`, or `ha-GH` for Hausa, which depends on what the phone has installed.
 - Her exact timbre is the TraffiAlert mp3 set. Until those clips are imported, or you point settings at a TTS service that returns her audio, you hear the phone voice with her rate, pitch, and locale.
-- AI rewrite and translate do nothing useful until you save your own endpoint and key.
+- Built-in AI sends the text you ask to rewrite or translate, up to 2000 characters, to O24's server. A custom endpoint is used only if you fill in the endpoint, model, and key.
 - There is no picture of a person anywhere in this project on purpose.
