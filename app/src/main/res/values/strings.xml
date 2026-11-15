@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">O24 Keyboard</string>
+    <string name="subtype_label">O24 Keyboard</string>
+    <string name="space_label">O24 Keyboard</string>
+    <string name="brand_name">OTUMFOUR</string>
+    <string name="brand_line">O24 Keyboard · in honour of the Asantehene</string>
+    <string name="history_disclaimer">Summaries are for cultural appreciation.</string>
+    <string name="learn_more">Learn more</string>
+    <string name="close">Close</string>
+    <string name="use_theme">Use this theme</string>
+    <string name="onboarding_welcome">Welcome to Otumfour</string>
+    <string name="onboarding_enable_title">Enable the keyboard</string>
+    <string name="onboarding_enable_body">O24 Keyboard types in English and Ghanaian languages. Enable it in Android settings, then choose it as your input method. You can do this now or after you pick a theme.</string>
+    <string name="onboarding_enable_button">Enable O24 Keyboard</string>
+    <string name="onboarding_choose_button">Choose it as your input method</string>
+    <string name="onboarding_next">Next · choose a theme</string>
+    <string name="onboarding_theme_title">Choose a theme</string>
+    <string name="onboarding_theme_body">Ten themes. The first eight are tied to Asanteman. Jersey Edition, at the end, is for sports lovers. Pick one. You can change it later in settings. Open Learn more for a short history.</string>
+    <string name="jersey_heading">Jersey Edition</string>
+    <string name="jersey_note">Original kits in club and national colours. Not official crests, badges, or trademarked artwork.</string>
+    <string name="onboarding_finish">Save theme and continue</string>
+
+    <string name="theme_golden_title">Golden Stool Royal</string>
+    <string name="theme_golden_blurb">Black keys, gold edges, a woven gold ground, and a glowing Serwaa mic.</string>
+    <string name="theme_kente_title">Kente Vibrant</string>
+    <string name="theme_kente_blurb">Gold, green, red, and black stripes behind white rounded keys.</string>
+    <string name="theme_adinkra_title">Adinkra Minimal</string>
+    <string name="theme_adinkra_blurb">Charcoal, faint Gye Nyame and Sankofa marks, gold shift and enter.</string>
+    <string name="theme_flag_title">Asante Flag</string>
+    <string name="theme_flag_blurb">Gold, black, and green bands, a faint Golden Stool, and dark translucent keys.</string>
+    <string name="theme_sika_title">Sika Dwa Kofi</string>
+    <string name="theme_sika_blurb">A glowing Golden Stool on black, gold-edged keys, and an OTUMFOUR spacebar.</string>
+    <string name="theme_crest_title">Royal Crest</string>
+    <string name="theme_crest_blurb">A gold, black, and green stripe, green and black keys, and gold action keys.</string>
+    <string name="theme_anokye_title">Okomfo Anokye</string>
+    <string name="theme_anokye_blurb">Red-brown and black, faint Adinkra, stone-dark keys, and gold shift and enter.</string>
+    <string name="theme_yaa_title">Yaa Asantewaa</string>
+    <string name="theme_yaa_blurb">Royal purple, faint gold patterns, plum keys, and gold shift and enter.</string>
+
+    <string name="history_golden">The Golden Stool, Sika Dwa Kofi, is the sacred soul of the Asante nation. It is not a chair a king sits on. Tradition says that around 1701, when the Asante states were joining as one kingdom, Ɔkɔmfo Anokye called the stool down from the sky and it came to rest with Osei Tutu I, the first Asantehene. From then it has stood for the unity and the sunsum, the soul, of Asanteman. The Asantehene is its custodian, not its occupant. Gold and black in this theme follow that honour. The weave behind the keys is an original drawing, not a photograph of palace property or of any person.</string>
+    <string name="history_kente">Kente is cloth woven in narrow strips and sewn into a larger piece. In Asante, Bonwire is the historic centre of that weaving, and the cloth became regalia of the Asantehene and of the court. Named patterns and colours carry meaning. Gold is widely linked with wealth and royalty, green with growth and the land, red with political feeling and sacrifice, and black with spiritual maturity. To wear kente is to mark ceremony and rank in Asanteman. This theme uses those colours as an original stripe behind the keys. It is not a copy of one named cloth, and it shows no person.</string>
+    <string name="history_adinkra">Adinkra are symbols of the Akan peoples, printed on cloth and used in Asante dress, especially at solemn gatherings. Each mark holds a proverb. Gye Nyame, “except God”, affirms that nothing surpasses God. Sankofa, “go back and fetch it”, teaches that a people may turn and recover what is worth keeping. The signs are a living language of Asanteman, not empty ornament. They have travelled with Asante culture into public life, cloth, and teaching. This theme draws Gye Nyame and Sankofa as simple gold lines on charcoal. The lines are original geometry, not a scanned cloth and not a portrait.</string>
+    <string name="history_flag">The flag of Asanteman is three horizontal bands: gold on top, black in the middle, and green below, with the Golden Stool at the centre. Gold is widely read as mineral wealth and royalty, black as the people of Asante and ancestral strength, and green as the forests and the land. The stool in the middle is the nation’s emblem, the same Sika Dwa Kofi that stands for the soul of the kingdom. The flag belongs to Asanteman and is distinct from the flag of the Republic of Ghana. This theme lays those bands behind the keys and draws the stool as an Asante stool, with a crescent seat, a pillar, a base, and bells.</string>
+    <string name="history_sika">Around 1701 Osei Tutu I, with the priest Ɔkɔmfo Anokye, drew the Asante states into one kingdom. Tradition says Anokye summoned a stool covered in gold from the sky. It descended to Osei Tutu and was named Sika Dwa Kofi, the Golden Stool born on a Friday. No Asantehene sits on it. To hold the stool is to hold the soul of the nation, and Asante has fought rather than give it up. The present Asantehene is Otumfuo Nana Osei Tutu II, enstooled on 26 April 1999 as the sixteenth Asantehene. This theme sets a glowing drawing of that stool, bells included, behind gold-edged keys. The spacebar reads OTUMFOUR, a popular spelling of his title.</string>
+    <string name="history_crest">The Asantehene is the king of Asanteman and the custodian of the Golden Stool. The office is seated at Manhyia Palace in Kumasi, where the Asantehene meets the Asanteman Council and receives the aman, the states of the union. Gold, black, and green are the public colours of that court and of the Asante flag. They are not a commercial logo, and this app does not speak for the palace. This theme places a thin stripe of those colours across the top of the keyboard, a green top row, black letter keys, and gold shift, delete, enter, and 123 keys. A small Golden Stool sits on the spacebar as a mark of the office.</string>
+    <string name="history_anokye">Ɔkɔmfo Anokye was the priest and adviser who, with Osei Tutu I, is credited with founding the Asante kingdom in the late seventeenth and early eighteenth centuries. Tradition gives him the spiritual bonds of the new union and the summoning of the Golden Stool from the sky. In Kumasi a sword said to have been planted by Anokye, which no one could draw out, became a known landmark of the city. The kingdom’s story is not told without him. This theme uses deep red-brown and black, faint Adinkra marks, and stone-dark keys. Its picture shows the stool in gold light among clouds, and a sword set in rock. It does not depict Anokye or any person.</string>
+    <string name="history_yaa">Nana Yaa Asantewaa was the Queen Mother, the Ɔhemaa, of Ejisu in Asante. In 1900 the British governor, Frederick Hodgson, demanded the Golden Stool. Yaa Asantewaa called the chiefs to resist, and she led Asante forces in the War of the Golden Stool. The war ended with a British victory and her exile to the Seychelles, where she died in 1921, but the stool was hidden and was not surrendered. Ejisu and Asanteman remember her courage. This theme carries her name, the year 1900, a gold crown, two crossed swords, and the Golden Stool on royal purple. The swords and the stool are emblems only. The theme does not depict Yaa Asantewaa or any person.</string>
+    <string name="theme_kotoko_title">Jersey Edition: Kotoko</string>
+    <string name="theme_kotoko_blurb">Deep red mesh, white letters, gold piping, and gold shift and enter.</string>
+    <string name="theme_asanteman_title">Jersey Edition: Asanteman</string>
+    <string name="theme_asanteman_blurb">Gold, black, and green bands, a Golden Stool, black keys, a green shift, and a gold enter.</string>
+    <string name="history_kotoko">Asante Kotoko Sporting Club was founded in 1935 in Kumasi. Supporters know the club as the Porcupine Warriors. The proverb tied to that name, “Kum apem a, apem beba”, says that if a thousand fall, a thousand more will come. Kotoko has long been among Ghana’s most successful football clubs, with many national league titles and two African Cup of Champions Clubs titles, in 1970 and 1983. Red, white, and gold are the colours of that story. This theme uses those colours, a mesh ground, and an original geometric quill. It does not copy the club’s crest, badge, or other trademarked artwork, and it shows no person.</string>
+    <string name="history_asanteman">Asanteman is the Asante nation, the union of states whose soul is the Golden Stool, Sika Dwa Kofi. The name means the Asante people as one body. Kumasi is the seat, and the Asantehene is custodian of the stool, not a king who sits on it. Gold, black, and green are the bands of the Asante flag: wealth and royalty, the people and the ancestors, and the forested land. Pride in Asanteman is pride in that union. This jersey lays those bands on a shirt, draws the stool with a crescent seat, a carved pillar, a base, and bells, and types on black keys with gold letters. The drawing is original. It is not a palace emblem or a club badge, and it shows no person.</string>
+</resources>
