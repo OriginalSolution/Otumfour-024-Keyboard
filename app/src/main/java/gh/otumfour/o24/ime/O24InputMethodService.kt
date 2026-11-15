@@ -2,6 +2,7 @@ package gh.otumfour.o24.ime
 
 import android.content.Intent
 import android.content.SharedPreferences
+import android.util.Log
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -98,15 +99,19 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        settings = store.get()
-        enterLabel = enterLabel(info)
-        suppressSuggest = isPassword(info) || isNumber(info)
-        page = if (isNumber(info)) BoardPage.SYMBOLS else BoardPage.LETTERS
-        shift = if (wantsCaps(info)) ShiftState.ONCE else ShiftState.OFF
-        undo = null
-        rejected.clear()
-        reloadKeyboard()
-        refreshSuggestions()
+        try {
+            settings = store.get()
+            enterLabel = enterLabel(info)
+            suppressSuggest = isPassword(info) || isNumber(info)
+            page = if (isNumber(info)) BoardPage.SYMBOLS else BoardPage.LETTERS
+            shift = if (wantsCaps(info)) ShiftState.ONCE else ShiftState.OFF
+            undo = null
+            rejected.clear()
+            reloadKeyboard()
+            refreshSuggestions()
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "onStartInputView failed", error)
+        }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -120,15 +125,20 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     override fun onComputeInsets(outInsets: Insets) {
-        super.onComputeInsets(outInsets)
-        val view = root ?: return
-        if (view.height == 0) return
-        val location = IntArray(2)
-        view.getLocationInWindow(location)
-        val top = location[1].coerceAtLeast(0)
-        outInsets.contentTopInsets = top
-        outInsets.visibleTopInsets = top
-        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_CONTENT
+        try {
+            super.onComputeInsets(outInsets)
+            val view = root ?: return
+            if (view.height <= 0) return
+            val location = IntArray(2)
+            view.getLocationInWindow(location)
+            val windowHeight = window?.window?.decorView?.height?.takeIf { it > 0 } ?: view.height
+            val top = location[1].coerceIn(0, windowHeight)
+            outInsets.contentTopInsets = top
+            outInsets.visibleTopInsets = top
+            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_CONTENT
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "onComputeInsets failed during a resize", error)
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -708,4 +718,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private data class EditTarget(val selected: Boolean, val before: Int, val after: Int, val text: String)
     private data class Undo(val original: String, val replacement: String)
+
+    private companion object {
+        const val TAG = "O24IME"
+    }
 }

@@ -8,8 +8,8 @@ import androidx.appcompat.app.AppCompatActivity
 /** About, including the photo credit. Histories stay on this page and in the theme carousel. */
 class AboutActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        prepareEdgeToEdge()
         super.onCreate(savedInstanceState)
+        prepareEdgeToEdge()
         val frame = PatternFrame(this)
         val scroll = ScrollView(this).apply { isFillViewport = true }
         val center = CenterFrame(this)

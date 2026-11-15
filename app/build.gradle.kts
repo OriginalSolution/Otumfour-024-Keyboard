@@ -11,8 +11,8 @@ android {
         applicationId = "gh.otumfour.o24"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.0.5"
+        versionCode = 7
+        versionName = "1.0.6"
         buildConfigField("String", "O24_AI_URL", "\"https://ffqchvmcdstxmjsimgdt.supabase.co/functions/v1/o24-ai\"")
         // Public Supabase anon key for the O24 AI proxy. The OpenAI key stays on the server.
         buildConfigField(
