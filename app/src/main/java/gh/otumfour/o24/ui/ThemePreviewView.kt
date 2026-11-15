@@ -65,7 +65,7 @@ class ThemePreviewView @JvmOverloads constructor(
         label.color = colors.suggestionText
         label.textSize = suggestionH * 0.42f
         label.isFakeBoldText = false
-        val samples = listOf("Akwaaba", "Ghana", "O24")
+        val samples = listOf("Akwaaba", "Ghana", "024")
         val slot = width / 3f
         samples.forEachIndexed { index, word ->
             val baseline = suggestionH * 0.68f

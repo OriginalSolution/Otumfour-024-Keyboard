@@ -77,12 +77,16 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     override fun onCreate() {
         super.onCreate()
-        store = SettingsStore(this)
-        learned = LearnedWords(this)
-        settings = store.get()
-        window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
-        getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
-            .registerOnSharedPreferenceChangeListener(this)
+        try {
+            store = SettingsStore(this)
+            learned = LearnedWords(this)
+            settings = store.get()
+            window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
+            getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
+                .registerOnSharedPreferenceChangeListener(this)
+        } catch (error: Throwable) {
+            rememberFailure("onCreate", error)
+        }
     }
 
     override fun onDestroy() {
@@ -97,10 +101,18 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         reloadKeyboard()
     }
 
+    override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
+        try {
+            super.onStartInput(attribute, restarting)
+        } catch (error: Throwable) {
+            rememberFailure("onStartInput", error)
+        }
+    }
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         try {
-            settings = store.get()
+            if (::store.isInitialized) settings = store.get()
             enterLabel = enterLabel(info)
             suppressSuggest = isPassword(info) || isNumber(info)
             page = if (isNumber(info)) BoardPage.SYMBOLS else BoardPage.LETTERS
@@ -109,8 +121,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             rejected.clear()
             reloadKeyboard()
             refreshSuggestions()
-        } catch (error: RuntimeException) {
-            Log.e(TAG, "onStartInputView failed", error)
+        } catch (error: Throwable) {
+            rememberFailure("onStartInputView", error)
         }
     }
 
@@ -142,7 +154,16 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     override fun onCreateInputView(): View {
-        settings = store.get()
+        return try {
+            createKeyboard()
+        } catch (error: Throwable) {
+            rememberFailure("onCreateInputView", error)
+            fallbackKeyboard()
+        }
+    }
+
+    private fun createKeyboard(): View {
+        if (::store.isInitialized) settings = store.get()
         val colors = colorsFor(settings.theme)
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -222,6 +243,29 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         }
         reloadKeyboard()
         return column
+    }
+
+    /** A plain board used only if the themed keyboard cannot be built. The service stays up. */
+    private fun fallbackKeyboard(): View {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(colorsFor(ThemeId.GOLDEN_STOOL).keyboardBg)
+        }
+        root = column
+        val board = KeyboardView(this).apply {
+            theme = ThemeId.GOLDEN_STOOL
+            colors = colorsFor(ThemeId.GOLDEN_STOOL)
+            rows = KeyboardModel.rows(BoardPage.LETTERS, KeyboardLanguage.ENGLISH, ShiftState.OFF, "Enter", "Otumfour")
+            onKey = { key -> onKey(key) }
+        }
+        keyboard = board
+        column.addView(board, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        return column
+    }
+
+    private fun rememberFailure(where: String, error: Throwable) {
+        Log.e(TAG, "$where failed", error)
+        runCatching { gh.otumfour.o24.CrashReport.save(this, error) }
     }
 
     private fun reloadKeyboard() {
@@ -521,7 +565,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     private fun aiUnavailable(): String? {
-        if (!settings.aiEnabled) return "Turn on AI in O24 Keyboard settings to rewrite and translate."
+        if (!settings.aiEnabled) return "Turn on AI in Otumfour settings to rewrite and translate."
         return null
     }
 

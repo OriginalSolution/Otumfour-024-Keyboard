@@ -78,21 +78,21 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: O24 Keyboard ${{ github.ref_name }}
+          name: Otumfour ${{ github.ref_name }}
           generate_release_notes: false
           files: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
           body: |
-            O24 Keyboard (Otumfour) is an Android input method made in honour of the Asantehene. It is not a publication of Manhyia Palace. The welcome slide uses one credited photograph of Otumfuo; the keyboard does not depict a person.
+            Otumfour is an Android input method made in honour of the Asantehene. It is not a publication of Manhyia Palace. The welcome slide uses one credited photograph of Otumfuo; the keyboard does not depict a person. Where a tagline needs a number, it is written 024.
 
-            Install the debug APK to try it, or the release APK signed with the test key unless repository signing secrets were set. Enable O24 Keyboard in Android settings, then choose it as your input method. The first launch asks you to enable it and pick a theme.
+            Install the debug APK to try it, or the release APK signed with the test key unless repository signing secrets were set. Enable Otumfour in Android settings, then choose it as your input method. The first launch asks you to enable it and pick a theme.
 
             ## Features
             - QWERTY, shift and caps, numbers and symbols, emoji, backspace, and enter
-            - Spacebar labelled O24 Keyboard, or OTUMFOUR on the Sika Dwa Kofi theme
+            - Spacebar labelled Otumfour, or OTUMFOUR on the Sika Dwa Kofi theme
             - Suggestion bar with three candidates. Autocorrect keeps known words and only replaces a one-step slip of a frequent word. Backspace undoes it
-            - AI rewrite and translate through O24's server, with no key in the app. Text is sent only when you tap AI or Translate. Settings is an on/off switch
+            - AI rewrite and translate through Otumfour's server, with no key in the app. Text is sent only when you tap AI or Translate. Settings is an on/off switch
             - Onboarding, settings, and an About page for Otumfuo
             - Ten drawn themes, with a history card for each
 
@@ -113,5 +113,5 @@ jobs:
 
             ## Known limitations
             - Dictionaries are seeds. Several Ghanaian lists are short and need native-speaker review.
-            - Built-in AI sends the text you ask to rewrite or translate (up to 2000 characters) to O24's server. A custom endpoint is hidden behind the version number on About and is used only if the endpoint, model, and key are all filled in.
+            - Built-in AI sends the text you ask to rewrite or translate (up to 2000 characters) to Otumfour's server. A custom endpoint is hidden behind the version number on About and is used only if the endpoint, model, and key are all filled in.
             - Without KEYSTORE_BASE64 and the matching password secrets, the release APK is signed with the committed test key. Do not use that key for the Play Store.

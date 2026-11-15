@@ -638,7 +638,7 @@ fun aboutColumn(activity: AppCompatActivity, onVersion: () -> Unit): LinearLayou
             CrashReport.read(activity)?.let { report ->
                 addView(outlinePill(activity, activity.getString(R.string.crash_share)) {
                     val clipboard = activity.getSystemService(ClipboardManager::class.java)
-                    clipboard?.setPrimaryClip(ClipData.newPlainText("O24 crash", report))
+                    clipboard?.setPrimaryClip(ClipData.newPlainText("Otumfour crash", report))
                     Toast.makeText(activity, R.string.crash_copied, Toast.LENGTH_SHORT).show()
                     val send = Intent(Intent.ACTION_SEND)
                         .setType("text/plain")

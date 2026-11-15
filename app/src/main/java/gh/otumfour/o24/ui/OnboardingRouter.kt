@@ -18,7 +18,7 @@ object OnboardingRouter {
     /**
      * Move only forward.
      * Enable (1) becomes Choose (2) once the keyboard is on.
-     * Choose stays on Choose until O24 is the default, then goes to the theme step (3).
+     * Choose stays on Choose until Otumfour is the default, then goes to the theme step (3).
      * A failed re-check must not send the user back to Enable.
      */
     fun forwardStep(current: Int, enabled: Boolean, isDefault: Boolean, allowAuto: Boolean): Int {
