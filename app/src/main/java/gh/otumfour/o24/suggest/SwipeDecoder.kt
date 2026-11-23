@@ -2,19 +2,23 @@ package gh.otumfour.o24.suggest
 
 import kotlin.math.hypot
 import kotlin.math.ln
-import kotlin.math.max
 
 data class SwipeSample(val x: Float, val y: Float, val time: Long)
 
 data class SwipeKey(val letter: Char, val x: Float, val y: Float)
 
 /**
- * Gesture typing. The finger path is matched to each word's ideal key centres
- * with dynamic time warping, plus a frequency prior and start/end key pruning.
- * This is an original SHARK2-style scorer. It does not include OpenBoard or HeliBoard code.
+ * Gesture typing. The finger path and each word's ideal key-centre path are
+ * resampled to the same number of points. Location distance and shape distance
+ * (after the two paths are centred) are combined with a frequency prior.
+ * The word must start and end near the finger. A raw trace of crossed keys is
+ * never returned. This is an original SHARK2-style scorer.
  */
 object SwipeDecoder {
     private const val PAUSE_MS = 170L
+    private const val SAMPLES = 32
+    private const val START_END_RADIUS = 1.5f
+    private const val FREQUENCY_WEIGHT = 0.08
 
     fun trace(samples: List<SwipeSample>, keys: List<SwipeKey>, keyWidth: Float): String {
         if (samples.isEmpty() || keys.isEmpty()) return ""
@@ -48,42 +52,48 @@ object SwipeDecoder {
         words: List<Pair<String, Int>>,
         limit: Int = 5,
     ): List<String> {
-        val traced = trace(samples, keys, keyWidth)
-        if (traced.isEmpty() || keys.isEmpty()) return emptyList()
-        val byLetter = keys.associateBy { it.letter }
-        val start = Qwerty.neighbours(traced.first())
-        val end = Qwerty.neighbours(traced.last())
-        val minLen = (traced.length - 1).coerceAtLeast(1)
-        val maxLen = traced.length + 2
+        if (samples.size < 2 || keys.isEmpty() || words.isEmpty()) return emptyList()
+        val width = keyWidth.coerceAtLeast(1f)
+        val byLetter = HashMap<Char, SwipeKey>(keys.size)
+        for (key in keys) byLetter[key.letter] = key
+        val origin = samples.first()
+        val finish = samples.last()
+        val finger = resample(samples.map { it.x to it.y }, SAMPLES)
+        val radius = width * START_END_RADIUS
         val pool = words.asSequence()
             .filter { (word, _) ->
-                word.length in minLen..maxLen &&
-                    word.first() in start &&
-                    word.last() in end &&
-                    word.all { it in byLetter }
+                word.length in 1..24 && word.all { it in byLetter }
             }
-            .sortedByDescending { it.second }
-            .take(280)
+            .mapNotNull { (word, freq) ->
+                val first = byLetter.getValue(word.first())
+                val last = byLetter.getValue(word.last())
+                val startGap = hypot(first.x - origin.x, first.y - origin.y)
+                val endGap = hypot(last.x - finish.x, last.y - finish.y)
+                if (startGap > radius || endGap > radius) return@mapNotNull null
+                Triple(word, freq, idealPath(word, byLetter))
+            }
             .toList()
-        if (pool.isEmpty()) return listOf(traced)
-        val finger = resample(samples.map { it.x to it.y }, 28)
-        val ranked = pool.map { (word, freq) ->
-            val ideal = word.map { letter ->
-                val key = byLetter.getValue(letter)
-                key.x to key.y
-            }
-            val dtw = dtw(finger, ideal) / keyWidth.coerceAtLeast(1f)
-            val exact = if (word == traced) 1.4 else if (word == traced.replace(Regex("(.)\\1"), "$1")) 0.35 else 0.0
-            val score = -dtw + ln(freq.coerceAtLeast(1).toDouble()) * 0.18 + exact
-            word to score
+        if (pool.isEmpty()) return emptyList()
+        val ranked = pool.map { (word, freq, ideal) ->
+            val template = resample(ideal, SAMPLES)
+            val location = pointDistance(finger, template) / width
+            val shape = pointDistance(centred(finger), centred(template)) / width
+            val prior = ln(freq.coerceAtLeast(1).toDouble()) * FREQUENCY_WEIGHT
+            word to -(0.62 * location + 0.38 * shape) + prior
         }.sortedByDescending { it.second }
-        val out = ArrayList<String>()
+        val out = ArrayList<String>(limit)
         for ((word, _) in ranked) {
             if (word !in out) out.add(word)
             if (out.size == limit) break
         }
-        return if (out.isEmpty() && traced.length > 1) listOf(traced) else out
+        return out
     }
+
+    private fun idealPath(word: String, byLetter: Map<Char, SwipeKey>): List<Pair<Float, Float>> =
+        word.map { letter ->
+            val key = byLetter.getValue(letter)
+            key.x to key.y
+        }
 
     private fun nearest(x: Float, y: Float, keys: List<SwipeKey>): SwipeKey? {
         var best: SwipeKey? = null
@@ -98,8 +108,32 @@ object SwipeDecoder {
         return best
     }
 
+    private fun centred(points: List<Pair<Float, Float>>): List<Pair<Float, Float>> {
+        if (points.isEmpty()) return points
+        var sx = 0.0
+        var sy = 0.0
+        for (point in points) {
+            sx += point.first
+            sy += point.second
+        }
+        val cx = (sx / points.size).toFloat()
+        val cy = (sy / points.size).toFloat()
+        return points.map { it.first - cx to it.second - cy }
+    }
+
+    private fun pointDistance(a: List<Pair<Float, Float>>, b: List<Pair<Float, Float>>): Float {
+        val n = minOf(a.size, b.size)
+        if (n == 0) return Float.MAX_VALUE
+        var sum = 0.0
+        for (i in 0 until n) {
+            sum += hypot(a[i].first - b[i].first, a[i].second - b[i].second)
+        }
+        return (sum / n).toFloat()
+    }
+
     private fun resample(points: List<Pair<Float, Float>>, count: Int): List<Pair<Float, Float>> {
-        if (points.size < 2) return points
+        if (points.isEmpty()) return points
+        if (points.size == 1 || count < 2) return List(count.coerceAtLeast(1)) { points.first() }
         val lengths = FloatArray(points.size)
         var total = 0f
         for (i in 1 until points.size) {
@@ -120,24 +154,6 @@ object SwipeDecoder {
             out.add(a.first + (b.first - a.first) * t to a.second + (b.second - a.second) * t)
         }
         return out
-    }
-
-    private fun dtw(a: List<Pair<Float, Float>>, b: List<Pair<Float, Float>>): Float {
-        val n = a.size
-        val m = b.size
-        val col = FloatArray(m + 1) { Float.MAX_VALUE / 4f }
-        col[0] = 0f
-        for (i in 1..n) {
-            var previous = col[0]
-            col[0] = Float.MAX_VALUE / 4f
-            for (j in 1..m) {
-                val cost = hypot(a[i - 1].first - b[j - 1].first, a[i - 1].second - b[j - 1].second)
-                val best = minOf(col[j], col[j - 1], previous) + cost
-                previous = col[j]
-                col[j] = best
-            }
-        }
-        return col[m] / max(n, m).toFloat()
     }
 
     private class Visit(

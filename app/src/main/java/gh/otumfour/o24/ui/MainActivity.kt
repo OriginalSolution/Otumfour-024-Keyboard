@@ -25,6 +25,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.BuildConfig
@@ -51,13 +52,11 @@ class MainActivity : AppCompatActivity() {
     private var versionTaps = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         prepareEdgeToEdge()
         store = SettingsStore(this)
-        val open = intent.getBooleanExtra(EXTRA_OPEN, false)
-        val finished = OnboardingRouter.showSettings(store.isOnboarded()) ||
-            intent.getBooleanExtra(EXTRA_AFTER_ONBOARDING, false)
-        if (!finished && !open) {
+        if (shouldLeaveForOnboarding(intent)) {
             startActivity(
                 Intent(this, OnboardingActivity::class.java)
                     .putExtra(OnboardingActivity.EXTRA_PAGE, store.onboardingPage()),
@@ -71,6 +70,20 @@ class MainActivity : AppCompatActivity() {
         val start = savedInstanceState?.getInt(STATE_PAGE)
             ?: intent.getIntExtra(EXTRA_PAGE, 0)
         installUi(start.coerceIn(0, PAGE_COUNT - 1))
+        if (savedInstanceState == null) LaunchArt.show(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (!::store.isInitialized || shouldLeaveForOnboarding(intent)) return
+        installUi(intent.getIntExtra(EXTRA_PAGE, 0).coerceIn(0, PAGE_COUNT - 1))
+    }
+
+    private fun shouldLeaveForOnboarding(source: Intent): Boolean {
+        val fromKeyboard = source.getBooleanExtra(EXTRA_OPEN, false)
+        val afterSlides = source.getBooleanExtra(EXTRA_AFTER_ONBOARDING, false)
+        return !OnboardingRouter.showSettingsFromKeyboard(store.isOnboarded(), fromKeyboard) && !afterSlides
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -233,7 +246,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun openSection(index: Int) {
         val pages = pager
-        if (pages != null) pages.setCurrentItem(index, true) else showDetail(index)
+        val target = SettingsPages.clamp(index)
+        if (pages != null) {
+            val smooth = SettingsPages.useSmoothScroll(pages.currentItem, target)
+            pages.setCurrentItem(target, smooth)
+        } else {
+            showDetail(target)
+        }
     }
 
     private fun pageAt(index: Int): View = when (index) {
@@ -593,15 +612,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private inner class PageAdapter : RecyclerView.Adapter<PageAdapter.Holder>() {
-        inner class Holder(view: View) : RecyclerView.ViewHolder(view)
+        inner class Holder(val frame: FrameLayout) : RecyclerView.ViewHolder(frame)
         override fun getItemCount(): Int = PAGE_COUNT
-        override fun getItemViewType(position: Int): Int = position
+        override fun getItemViewType(position: Int): Int = SettingsPages.clamp(position)
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-            val view = pageAt(viewType)
-            view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            return Holder(view)
+            val frame = FrameLayout(this@MainActivity)
+            frame.layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            return Holder(frame)
         }
-        override fun onBindViewHolder(holder: Holder, position: Int) = Unit
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val page = SettingsPages.clamp(position)
+            if (holder.frame.tag == page && holder.frame.childCount > 0) return
+            holder.frame.removeAllViews()
+            val content = pageAt(page)
+            content.layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+            holder.frame.addView(content)
+            holder.frame.tag = page
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -612,7 +645,7 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_OPEN = "open"
         const val EXTRA_THEME = "theme_index"
         private const val STATE_PAGE = "page"
-        private const val PAGE_COUNT = 7
+        private const val PAGE_COUNT = SettingsPages.COUNT
         private val PAGE_TITLES = intArrayOf(
             R.string.settings_home,
             R.string.settings_theme,

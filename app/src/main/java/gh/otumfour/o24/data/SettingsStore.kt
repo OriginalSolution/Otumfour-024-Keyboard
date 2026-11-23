@@ -85,7 +85,7 @@ class SettingsStore(context: Context) {
             .putString(KEY_AI_KEY, next.aiKey)
             .putBoolean(KEY_AI_ENABLED, next.aiEnabled)
             .putBoolean(KEY_SWIPE, next.swipeTyping)
-            .apply()
+            .commit()
     }
 
     private fun decodeLanguages(raw: String?): List<KeyboardLanguage> {

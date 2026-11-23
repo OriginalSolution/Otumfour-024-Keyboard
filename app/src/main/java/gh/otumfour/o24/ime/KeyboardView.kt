@@ -64,6 +64,10 @@ class KeyboardView @JvmOverloads constructor(
     var hapticEnabled: Boolean = true
     var soundEnabled: Boolean = false
     var swipeEnabled: Boolean = true
+        set(value) {
+            field = value
+            if (!value) clearTrail()
+        }
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -200,9 +204,13 @@ class KeyboardView @JvmOverloads constructor(
                 downTime = event.eventTime
                 downX = event.x
                 downY = event.y
-                trail.clear()
-                trailUntil = 0L
-                trail.add(SwipeSample(event.x, event.y, event.eventTime))
+                if (swipeEnabled) {
+                    trail.clear()
+                    trailUntil = 0L
+                    trail.add(SwipeSample(event.x, event.y, event.eventTime))
+                } else {
+                    clearTrail()
+                }
                 parent?.requestDisallowInterceptTouchEvent(true)
                 if (key.repeat) {
                     onKey(key)
@@ -215,8 +223,8 @@ class KeyboardView @JvmOverloads constructor(
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
-                trail.add(SwipeSample(event.x, event.y, event.eventTime))
                 val travel = hypot(event.x - downX, event.y - downY)
+                if (swipeEnabled) trail.add(SwipeSample(event.x, event.y, event.eventTime))
                 val letter = pressed?.value?.length == 1 && pressed?.value?.get(0)?.isLetter() == true
                 if (!swiping && swipeEnabled && letter && travel > averageKeyWidth() * 1.5f) {
                     swiping = true
@@ -228,11 +236,15 @@ class KeyboardView @JvmOverloads constructor(
                     }
                 }
                 if (!swiping) {
-                    val key = hit(event.x, event.y)
-                    if (key != pressed) {
-                        handler.removeCallbacks(longRunnable)
-                        handler.removeCallbacks(repeatRunnable)
-                        pressed = key
+                    if (!swipeEnabled) {
+                        if (hit(event.x, event.y) != pressed) pressed = null
+                    } else {
+                        val key = hit(event.x, event.y)
+                        if (key != pressed) {
+                            handler.removeCallbacks(longRunnable)
+                            handler.removeCallbacks(repeatRunnable)
+                            pressed = key
+                        }
                     }
                 }
                 invalidate()
@@ -241,12 +253,19 @@ class KeyboardView @JvmOverloads constructor(
                 handler.removeCallbacks(longRunnable)
                 handler.removeCallbacks(repeatRunnable)
                 val key = pressed
-                if (event.actionMasked == MotionEvent.ACTION_UP && swiping && trail.size > 1) {
+                val moved = hypot(event.x - downX, event.y - downY)
+                if (event.actionMasked == MotionEvent.ACTION_UP && swipeEnabled && swiping && trail.size > 1) {
                     trail.add(SwipeSample(event.x, event.y, event.eventTime))
                     tick()
                     onSwipe(trail.toList(), letterKeys(), averageKeyWidth())
                     trailUntil = SystemClock.uptimeMillis() + 300L
                     handler.postDelayed({ invalidate() }, 16L)
+                } else if (
+                    event.actionMasked == MotionEvent.ACTION_UP &&
+                    swipeEnabled.not() &&
+                    moved > dp(18f)
+                ) {
+                    clearTrail()
                 } else if (event.actionMasked == MotionEvent.ACTION_UP && key != null && !longFired && hit(event.x, event.y) == key) {
                     tick()
                     if (soundEnabled) {
@@ -254,6 +273,9 @@ class KeyboardView @JvmOverloads constructor(
                             ?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, 0.35f)
                     }
                     onKey(key)
+                    clearTrail()
+                } else {
+                    clearTrail()
                 }
                 pressed = null
                 swiping = false
@@ -400,8 +422,13 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private fun gestureInset(): Float {
-        val insets = rootWindowInsets ?: return 0f
-        return insets.systemWindowInsetBottom.toFloat()
+        val reported = rootWindowInsets?.systemWindowInsetBottom ?: 0
+        return ImeWindowLayout.bottomPaddingPx(reported).toFloat()
+    }
+
+    private fun clearTrail() {
+        trail.clear()
+        trailUntil = 0L
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {

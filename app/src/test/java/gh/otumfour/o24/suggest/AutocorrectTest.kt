@@ -1,6 +1,7 @@
 package gh.otumfour.o24.suggest
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,6 +22,14 @@ class AutocorrectTest {
     @Test
     fun replacesACloseFrequentTypo() {
         assertEquals("the", Autocorrect.choose("teh", lexicon.suggest("teh"), known = false))
+    }
+
+    @Test
+    fun aTypoAutocorrectWouldReplaceIsNotLearned() {
+        val suggestions = lexicon.suggest("teh")
+        assertEquals("the", Autocorrect.choose("teh", suggestions, known = false))
+        assertFalse(Autocorrect.shouldLearn("teh", suggestions))
+        assertTrue(Autocorrect.shouldLearn("akwaaba", lexicon.suggest("akwaaba")))
     }
 
     @Test

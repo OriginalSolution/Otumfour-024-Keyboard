@@ -16,6 +16,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.R
@@ -47,6 +48,7 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         prepareEdgeToEdge()
         val store = SettingsStore(this)
@@ -64,6 +66,7 @@ class OnboardingActivity : AppCompatActivity() {
         )
         val start = OnboardingRouter.forwardStep(base, keyboardEnabled(), keyboardSelected(), allowAuto = true)
         installUi(start)
+        if (savedInstanceState == null) LaunchArt.show(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

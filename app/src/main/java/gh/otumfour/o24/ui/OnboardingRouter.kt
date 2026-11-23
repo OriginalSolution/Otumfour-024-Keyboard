@@ -9,6 +9,10 @@ object OnboardingRouter {
 
     fun showSettings(onboarded: Boolean): Boolean = onboarded
 
+    /** The keyboard gear must open Settings even if onboarding was never finished. */
+    fun showSettingsFromKeyboard(onboarded: Boolean, openedFromKeyboard: Boolean): Boolean =
+        openedFromKeyboard || onboarded
+
     /** Saved instance wins, then an explicit request, then the page stored on disk. */
     fun resumePage(stored: Int, requested: Int? = null, restored: Int? = null): Int {
         val raw = restored ?: requested ?: stored

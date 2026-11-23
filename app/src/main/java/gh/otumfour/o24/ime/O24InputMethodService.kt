@@ -1,15 +1,22 @@
 package gh.otumfour.o24.ime
 
+import android.app.ActivityOptions
+import android.app.Dialog
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Build
 import android.util.Log
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
+import android.view.Window
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.widget.Button
@@ -35,6 +42,7 @@ import gh.otumfour.o24.suggest.TypingEdits
 import gh.otumfour.o24.theme.PhotoBackdrop
 import gh.otumfour.o24.theme.ThemeId
 import gh.otumfour.o24.theme.colorsFor
+import androidx.core.view.WindowCompat
 import gh.otumfour.o24.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +86,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private var toneRow: LinearLayout? = null
     private var languageButton: Button? = null
     private var popup: PopupWindow? = null
+    private var themeDialog: Dialog? = null
     private var undo: Undo? = null
     private var swipeCommitted: String? = null
     private val rejected = HashSet<String>()
@@ -90,7 +99,11 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             store = SettingsStore(this)
             learned = LearnedWords(this)
             settings = store.get()
-            window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
+            window?.window?.let { imeWindow ->
+                // Keep the keyboard above the navigation bar instead of resizing when the inset flickers.
+                WindowCompat.setDecorFitsSystemWindows(imeWindow, true)
+                imeWindow.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
+            }
             getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(this)
         } catch (error: Throwable) {
@@ -113,6 +126,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         try {
             super.onStartInput(attribute, restarting)
+            clearTransientUi()
         } catch (error: Throwable) {
             rememberFailure("onStartInput", error)
         }
@@ -128,6 +142,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             shift = if (wantsCaps(info)) ShiftState.ONCE else ShiftState.OFF
             undo = null
             rejected.clear()
+            clearTransientUi()
+            keyboard?.swipeEnabled = settings.swipeTyping && !suppressSuggest
             reloadKeyboard()
             refreshSuggestions()
         } catch (error: Throwable) {
@@ -137,7 +153,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     override fun onFinishInputView(finishingInput: Boolean) {
         popup?.dismiss()
+        clearTransientUi()
         super.onFinishInputView(finishingInput)
+    }
+
+    private fun clearTransientUi() {
+        hideChoices()
+        showStatus("")
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -243,7 +265,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         toolbar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         toolbar.addView(pill("AI").also { it.setOnClickListener { onAi() } }, marginStart())
         toolbar.addView(pill("Translate").also { it.setOnClickListener { onTranslate() } }, marginStart())
-        toolbar.addView(pill("⚙").also { it.setOnClickListener { showThemePicker(it) } }, marginStart())
+        toolbar.addView(pill("⚙").also { button ->
+            button.setOnClickListener { showThemePicker(button) }
+            button.setOnLongClickListener {
+                openSettings()
+                true
+            }
+        }, marginStart())
         column.addView(
             HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
@@ -421,7 +449,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val beforeWord = ic.getTextBeforeCursor(word.length + 24, 0)?.toString().orEmpty().dropLast(word.length)
         val known = wordIsKnown(word) || TypingEdits.capitalisedName(word, beforeWord)
         val choice = if (!suppressSuggest && settings.autocorrect) {
-            Lexicon.autocorrect(word, ranked, known, rejected)
+            correction(word, known)
         } else {
             null
         }
@@ -433,10 +461,25 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             swipeCommitted = null
             learned.learn(settings.language.code, written)
         } else {
-            if (!suppressSuggest && word.length >= 3 && !known) learned.learn(settings.language.code, word)
+            if (shouldRemember(word)) learned.learn(settings.language.code, word)
             ic.commitText(trailing, 1)
             undo = null
         }
+    }
+
+    /** The suggestion bar can still be empty on the first letters. Ask the word list directly. */
+    private fun correction(word: String, known: Boolean): String? {
+        val live = Lexicon.autocorrect(word, ranked, known, rejected)
+        if (live != null) return live
+        val fresh = lexicon(settings.language).suggest(word, learned.load(settings.language.code))
+        return Lexicon.autocorrect(word, fresh, known, rejected)
+    }
+
+    private fun shouldRemember(word: String): Boolean {
+        if (suppressSuggest || word.length < 3 || wordIsKnown(word)) return false
+        if (!settings.autocorrect) return true
+        val suggestions = lexicon(settings.language).suggest(word)
+        return Autocorrect.shouldLearn(word, suggestions)
     }
 
     private fun wordIsKnown(word: String): Boolean {
@@ -761,33 +804,23 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private fun showThemePicker(anchor: View) {
         popup?.dismiss()
+        themeDialog?.dismiss()
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(10), dp(10), dp(12))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
             background = GradientDrawable().apply {
                 cornerRadius = dp(18).toFloat()
                 setColor(Color.parseColor("#12151C"))
             }
         }
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        header.addView(TextView(this).apply {
+        column.addView(TextView(this).apply {
             text = getString(gh.otumfour.o24.R.string.settings_theme)
             setTextColor(Color.parseColor("#F4F6FB"))
             textSize = 16f
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(pill(getString(gh.otumfour.o24.R.string.theme_picker_settings)).also {
-            it.setOnClickListener {
-                popup?.dismiss()
-                openSettings()
-            }
         })
-        column.addView(header)
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, dp(8), 0, 0)
+            setPadding(0, dp(8), 0, dp(8))
         }
         val photosFirst = listOf(
             ThemeId.OTUMFUO,
@@ -803,13 +836,35 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             isHorizontalScrollBarEnabled = false
             addView(row)
         })
-        val width = (resources.displayMetrics.widthPixels - dp(24)).coerceAtMost(dp(520))
-        val window = PopupWindow(column, width, LinearLayout.LayoutParams.WRAP_CONTENT, true)
-        window.isOutsideTouchable = true
-        window.elevation = dp(8).toFloat()
-        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
-        popup = window
-        window.showAsDropDown(anchor, anchor.width - width, -dp(8))
+        column.addView(Button(this).apply {
+            text = getString(gh.otumfour.o24.R.string.theme_picker_settings)
+            isAllCaps = false
+            textSize = 16f
+            setTextColor(Color.parseColor("#12151C"))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(24).toFloat()
+                setColor(Color.parseColor("#F0C94A"))
+            }
+            setOnClickListener {
+                themeDialog?.dismiss()
+                openSettings()
+            }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)))
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setContentView(column)
+        val token = window?.window?.decorView?.windowToken
+        dialog.window?.apply {
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            if (token != null) {
+                setType(WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG)
+                attributes = attributes.apply { this.token = token }
+            }
+            setGravity(Gravity.BOTTOM)
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
+        }
+        themeDialog = dialog
+        dialog.show()
     }
 
     private fun themeCard(theme: ThemeId): View {
@@ -841,6 +896,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         card.setOnClickListener {
             store.update { it.copy(theme = theme) }
             settings = store.get()
+            themeDialog?.dismiss()
             popup?.dismiss()
             reloadKeyboard()
         }
@@ -851,7 +907,31 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     private fun openSettings() {
-        startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra(MainActivity.EXTRA_OPEN, true)
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                val options = ActivityOptions.makeBasic().apply {
+                    pendingIntentBackgroundActivityStartMode =
+                        ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                }
+                val pending = PendingIntent.getActivity(
+                    this,
+                    7,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+                pending.send(this, 0, null, null, null, null, options.toBundle())
+            } else {
+                startActivity(intent)
+            }
+        } catch (error: Throwable) {
+            Log.e(TAG, "Settings did not open from the keyboard", error)
+            runCatching { startActivity(intent) }
+                .onFailure { Log.e(TAG, "Settings fallback failed", it) }
+        }
     }
 
     private fun showStatus(message: String) {

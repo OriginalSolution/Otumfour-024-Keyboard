@@ -40,6 +40,15 @@ object Autocorrect {
         return best.first
     }
 
+    /**
+     * A slip this function would replace is not stored. Once it is stored, a later
+     * space treats it as a word the person meant and leaves the typo in place.
+     */
+    fun shouldLearn(typed: String, suggestions: List<Suggestion>): Boolean {
+        if (typed.length < 3) return false
+        return choose(typed, suggestions, known = false) == null
+    }
+
     /** The typed word is always the first candidate so it can be kept. */
     fun display(typed: String, suggestions: List<Suggestion>): List<Suggestion?> {
         val lower = typed.lowercase()
