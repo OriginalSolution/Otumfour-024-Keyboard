@@ -13,6 +13,12 @@ class OnboardingRouterTest {
     }
 
     @Test
+    fun theKeyboardGearOpensSettingsEvenBeforeOnboarding() {
+        assertTrue(OnboardingRouter.showSettingsFromKeyboard(onboarded = false, openedFromKeyboard = true))
+        assertFalse(OnboardingRouter.showSettingsFromKeyboard(onboarded = false, openedFromKeyboard = false))
+    }
+
+    @Test
     fun incompleteOnboardingResumesTheStoredStep() {
         assertEquals(1, OnboardingRouter.resumePage(stored = 1))
         assertEquals(2, OnboardingRouter.resumePage(stored = 2, requested = null, restored = null))

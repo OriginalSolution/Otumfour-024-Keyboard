@@ -25,6 +25,7 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.BuildConfig
@@ -51,13 +52,11 @@ class MainActivity : AppCompatActivity() {
     private var versionTaps = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         prepareEdgeToEdge()
         store = SettingsStore(this)
-        val open = intent.getBooleanExtra(EXTRA_OPEN, false)
-        val finished = OnboardingRouter.showSettings(store.isOnboarded()) ||
-            intent.getBooleanExtra(EXTRA_AFTER_ONBOARDING, false)
-        if (!finished && !open) {
+        if (shouldLeaveForOnboarding(intent)) {
             startActivity(
                 Intent(this, OnboardingActivity::class.java)
                     .putExtra(OnboardingActivity.EXTRA_PAGE, store.onboardingPage()),
@@ -71,6 +70,20 @@ class MainActivity : AppCompatActivity() {
         val start = savedInstanceState?.getInt(STATE_PAGE)
             ?: intent.getIntExtra(EXTRA_PAGE, 0)
         installUi(start.coerceIn(0, PAGE_COUNT - 1))
+        if (savedInstanceState == null) LaunchArt.show(this)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (!::store.isInitialized || shouldLeaveForOnboarding(intent)) return
+        installUi(intent.getIntExtra(EXTRA_PAGE, 0).coerceIn(0, PAGE_COUNT - 1))
+    }
+
+    private fun shouldLeaveForOnboarding(source: Intent): Boolean {
+        val fromKeyboard = source.getBooleanExtra(EXTRA_OPEN, false)
+        val afterSlides = source.getBooleanExtra(EXTRA_AFTER_ONBOARDING, false)
+        return !OnboardingRouter.showSettingsFromKeyboard(store.isOnboarded(), fromKeyboard) && !afterSlides
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

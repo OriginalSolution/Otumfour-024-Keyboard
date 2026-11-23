@@ -14,4 +14,10 @@
         <item name="android:textColorPrimary">@color/ink</item>
         <item name="android:textColorSecondary">#CDBF98</item>
     </style>
+
+    <style name="Theme.O24.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.O24</item>
+    </style>
 </resources>

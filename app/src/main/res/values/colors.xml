@@ -9,4 +9,6 @@
     <color name="kente_red">#C8102E</color>
     <color name="kente_black">#111111</color>
     <color name="adinkra_bg">#1C1C1C</color>
+    <color name="ic_launcher_background">#000000</color>
+    <color name="splash_background">#000000</color>
 </resources>
