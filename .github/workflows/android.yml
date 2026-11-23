@@ -91,7 +91,7 @@ jobs:
             ## Features
             - QWERTY, shift and caps, numbers and symbols, emoji, backspace, and enter
             - Swipe typing, with a red-to-gold trail. Autocorrect on space, undone by the next backspace
-            - Night and Day, the ten drawn themes, and four photograph themes
+            - Night and Day, the ten drawn themes, and four photograph themes. Otumfuo Osei Tutu II is the default, and the gear button opens the photo thumbnails
             - Spacebar labelled Otumfour, or OTUMFOUR on the Sika Dwa Kofi theme
             - On a wide screen the keyboard splits, as on an unfolded fold
             - Suggestion bar with three candidates. Autocorrect keeps known words and only replaces a one-step slip of a frequent word. Backspace undoes it
