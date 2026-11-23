@@ -3,6 +3,7 @@ package gh.otumfour.o24.data
 import android.content.Context
 import gh.otumfour.o24.lang.KeyboardLanguage
 import gh.otumfour.o24.theme.ThemeId
+import gh.otumfour.o24.theme.ThemeMigration
 
 data class O24Settings(
     val theme: ThemeId,
@@ -27,8 +28,16 @@ class SettingsStore(context: Context) {
         val language = KeyboardLanguage.fromCode(prefs.getString(KEY_LANGUAGE, null)).let { chosen ->
             if (chosen in enabled) chosen else enabled.first()
         }
+        val migrated = prefs.getBoolean(KEY_THEME_MIGRATED, false)
+        val storedTheme = ThemeMigration.storedAfterUpdate(prefs.getString(KEY_THEME, null), migrated)
+        if (!migrated || prefs.getString(KEY_THEME, null) != storedTheme) {
+            prefs.edit()
+                .putString(KEY_THEME, storedTheme)
+                .putBoolean(KEY_THEME_MIGRATED, true)
+                .apply()
+        }
         return O24Settings(
-            theme = ThemeId.fromStorage(prefs.getString(KEY_THEME, null)),
+            theme = ThemeId.fromStorage(storedTheme),
             language = language,
             enabledLanguages = enabled,
             autocorrect = prefs.getBoolean(KEY_AUTOCORRECT, true),
@@ -90,6 +99,7 @@ class SettingsStore(context: Context) {
     companion object {
         const val NAME = "o24_settings"
         const val KEY_THEME = "theme"
+        const val KEY_THEME_MIGRATED = "theme_migrated_109"
         const val KEY_LANGUAGE = "language"
         const val KEY_ENABLED = "enabled_langs"
         const val KEY_AUTOCORRECT = "autocorrect"

@@ -14,6 +14,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.widget.Button
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -49,7 +50,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private val lexicons = HashMap<String, Lexicon>()
     private var settings: O24Settings = O24Settings(
-        theme = ThemeId.GOLDEN_STOOL,
+        theme = ThemeId.OTUMFUO,
         language = KeyboardLanguage.ENGLISH,
         enabledLanguages = KeyboardLanguage.entries.toList(),
         autocorrect = true,
@@ -242,7 +243,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         toolbar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         toolbar.addView(pill("AI").also { it.setOnClickListener { onAi() } }, marginStart())
         toolbar.addView(pill("Translate").also { it.setOnClickListener { onTranslate() } }, marginStart())
-        toolbar.addView(pill("⚙").also { it.setOnClickListener { openSettings() } }, marginStart())
+        toolbar.addView(pill("⚙").also { it.setOnClickListener { showThemePicker(it) } }, marginStart())
         column.addView(
             HorizontalScrollView(this).apply {
                 isHorizontalScrollBarEnabled = false
@@ -318,7 +319,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
                 stylePill(child, colors.actionFill, colors.actionLabel, glow = false)
             }
         }
-        parent.setBackgroundColor(colors.toolbarBg)
+        parent.setBackgroundColor(if (colors.photoAsset != null) Color.TRANSPARENT else colors.toolbarBg)
     }
 
     private fun onKey(key: KeySpec) {
@@ -714,9 +715,10 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             return
         }
         view.setTextColor(if (primary) Color.parseColor("#F0C94A") else colors.suggestionText)
+        val chip = if (colors.photoAsset != null) Color.argb(220, 18, 21, 28) else colors.keyFill
         view.background = GradientDrawable().apply {
             cornerRadius = dp(24).toFloat()
-            setColor(if (primary) 0x1AF0C94A else colors.keyFill)
+            setColor(if (primary) 0xE61A1408.toInt() else chip)
             val stroke = if (primary) Color.parseColor("#F0C94A") else colors.keyStroke
             setStroke(dp(if (primary) 2 else 1), stroke)
         }
@@ -755,6 +757,97 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         window.elevation = dp(6).toFloat()
         popup = window
         window.showAsDropDown(anchor)
+    }
+
+    private fun showThemePicker(anchor: View) {
+        popup?.dismiss()
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(12))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(Color.parseColor("#12151C"))
+            }
+        }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(TextView(this).apply {
+            text = getString(gh.otumfour.o24.R.string.settings_theme)
+            setTextColor(Color.parseColor("#F4F6FB"))
+            textSize = 16f
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(pill(getString(gh.otumfour.o24.R.string.theme_picker_settings)).also {
+            it.setOnClickListener {
+                popup?.dismiss()
+                openSettings()
+            }
+        })
+        column.addView(header)
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(8), 0, 0)
+        }
+        val photosFirst = listOf(
+            ThemeId.OTUMFUO,
+            ThemeId.GOLD_REGALIA,
+            ThemeId.YAA_PHOTO,
+            ThemeId.ANOKYE_PHOTO,
+            ThemeId.NIGHT,
+            ThemeId.DAY,
+        )
+        val rest = ThemeId.entries.filter { it !in photosFirst }
+        (photosFirst + rest).forEach { theme -> row.addView(themeCard(theme)) }
+        column.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+        })
+        val width = (resources.displayMetrics.widthPixels - dp(24)).coerceAtMost(dp(520))
+        val window = PopupWindow(column, width, LinearLayout.LayoutParams.WRAP_CONTENT, true)
+        window.isOutsideTouchable = true
+        window.elevation = dp(8).toFloat()
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        popup = window
+        window.showAsDropDown(anchor, anchor.width - width, -dp(8))
+    }
+
+    private fun themeCard(theme: ThemeId): View {
+        val selected = settings.theme == theme
+        val colors = colorsFor(theme)
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), dp(4), dp(4), dp(6))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(14).toFloat()
+                setColor(Color.parseColor("#1A1F2A"))
+                setStroke(dp(if (selected) 2 else 1), if (selected) Color.parseColor("#F0C94A") else Color.argb(36, 255, 255, 255))
+            }
+        }
+        val thumb = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            val photo = colors.photoAsset
+            if (photo != null) setImageBitmap(PhotoBackdrop.bitmap(this@O24InputMethodService, photo))
+            else setBackgroundColor(colors.keyboardBg)
+        }
+        card.addView(thumb, LinearLayout.LayoutParams(dp(108), dp(72)))
+        card.addView(TextView(this).apply {
+            text = getString(theme.titleRes)
+            setTextColor(Color.parseColor("#F4F6FB"))
+            textSize = 12f
+            maxLines = 2
+            setPadding(dp(2), dp(4), dp(2), 0)
+        }, LinearLayout.LayoutParams(dp(108), LinearLayout.LayoutParams.WRAP_CONTENT))
+        card.setOnClickListener {
+            store.update { it.copy(theme = theme) }
+            settings = store.get()
+            popup?.dismiss()
+            reloadKeyboard()
+        }
+        val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        params.marginEnd = dp(8)
+        card.layoutParams = params
+        return card
     }
 
     private fun openSettings() {

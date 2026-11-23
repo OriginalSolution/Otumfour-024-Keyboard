@@ -30,7 +30,7 @@ enum class ThemeId(
     ;
 
     companion object {
-        fun fromStorage(value: String?): ThemeId = entries.firstOrNull { it.storage == value } ?: NIGHT
+        fun fromStorage(value: String?): ThemeId = entries.firstOrNull { it.storage == value } ?: OTUMFUO
     }
 }
 
@@ -78,19 +78,19 @@ private fun modernTheme(id: ThemeId, light: Boolean, photo: String?): ThemeColor
     return ThemeColors(
         id = id,
         keyboardBg = Color.parseColor(if (night) "#0D1016" else "#D5D8E0"),
-        keyFill = Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
-        keyStroke = if (night) Color.argb(36, 255, 255, 255) else Color.argb(28, 15, 18, 28),
+        keyFill = if (photo != null) Color.argb(150, 26, 31, 42) else Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
+        keyStroke = if (photo != null) Color.argb(90, 255, 255, 255) else if (night) Color.argb(36, 255, 255, 255) else Color.argb(28, 15, 18, 28),
         keyLabel = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
-        actionFill = Color.parseColor(if (night) "#141821" else "#E1E4EC"),
+        actionFill = if (photo != null) Color.argb(160, 20, 24, 33) else Color.parseColor(if (night) "#141821" else "#E1E4EC"),
         actionLabel = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
         accentFill = Color.parseColor("#E11D2E"),
         accentLabel = Color.parseColor("#FFFFFF"),
-        spaceFill = Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
+        spaceFill = if (photo != null) Color.argb(150, 26, 31, 42) else Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
         spaceLabel = Color.parseColor(if (night) "#F0C94A" else "#8A5A00"),
         suggestionBg = Color.parseColor(if (night) "#0D1016" else "#D5D8E0"),
         suggestionText = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
         toolbarBg = Color.parseColor(if (night) "#0D1016" else "#D5D8E0"),
-        pillFill = Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
+        pillFill = if (photo != null) Color.argb(210, 18, 21, 28) else Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
         pillText = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
         micFill = Color.parseColor("#E11D2E"),
         micLabel = Color.parseColor("#FFFFFF"),

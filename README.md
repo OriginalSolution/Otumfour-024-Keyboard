@@ -1,6 +1,6 @@
 # Otumfour
 
-Otumfour is an Android keyboard made in honour of the Asantehene, the king of Asante (Ashanti) in Ghana. It is an independent app. It is not a publication of Manhyia Palace. The welcome slide shows one credited photograph of Otumfuo Osei Tutu II. Night is the default keyboard. Four photograph themes place a supplied photo behind the keys only.
+Otumfour is an Android keyboard made in honour of the Asantehene, the king of Asante (Ashanti) in Ghana. It is an independent app. It is not a publication of Manhyia Palace. The welcome slide shows one credited photograph of Otumfuo Osei Tutu II. The Otumfuo Osei Tutu II photograph is the default keyboard background. Three more photograph themes sit behind the keys, and the gear button opens their thumbnails.
 
 The name Otumfour is a popular spelling of the title Otumfuo. Where a tagline needs a number, it is written 024.
 
