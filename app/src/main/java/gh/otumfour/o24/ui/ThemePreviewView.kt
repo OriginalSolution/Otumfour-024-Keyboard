@@ -55,8 +55,10 @@ class ThemePreviewView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        ThemeArt.draw(canvas, theme, width, height)
         val colors = colorsFor(theme)
+        val photo = colors.photoAsset
+        if (photo != null) gh.otumfour.o24.theme.PhotoBackdrop.draw(context, canvas, photo, width, height)
+        else ThemeArt.draw(canvas, theme, width, height)
         val gap = dp(3f)
         val suggestionH = height * 0.14f
         fill.style = Paint.Style.FILL

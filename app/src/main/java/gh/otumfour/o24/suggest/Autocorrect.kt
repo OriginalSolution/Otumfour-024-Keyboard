@@ -27,10 +27,17 @@ object Autocorrect {
         val lower = typed.lowercase()
         if (known || lower in rejected || blocked(typed)) return null
         if (suggestions.any { it.distance == 0 && !it.completion && it.word == lower }) return null
-        val best = suggestions.firstOrNull { suggestion ->
-            !suggestion.completion && suggestion.distance == 1 && suggestion.word != lower && suggestion.frequency >= MIN_FREQUENCY
-        } ?: return null
-        return best.word
+        val hits = suggestions.mapNotNull { suggestion ->
+            if (suggestion.completion || suggestion.word == lower || suggestion.frequency < MIN_FREQUENCY) return@mapNotNull null
+            val cost = Qwerty.editCost(lower, suggestion.word) ?: return@mapNotNull null
+            Triple(suggestion.word, cost, suggestion.frequency)
+        }.sortedWith(compareBy<Triple<String, Float, Int>> { it.second }.thenByDescending { it.third })
+        val best = hits.firstOrNull() ?: return null
+        val second = hits.getOrNull(1)
+        if (second != null && best.second + 0.2f >= second.second && best.third < (second.third * 1.35f).toInt()) {
+            return null
+        }
+        return best.first
     }
 
     /** The typed word is always the first candidate so it can be kept. */

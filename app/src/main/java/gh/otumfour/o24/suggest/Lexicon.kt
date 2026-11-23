@@ -23,6 +23,8 @@ class Lexicon(entries: List<Pair<String, Int>>) {
 
     fun contains(raw: String): Boolean = words.any { it.word == raw.lowercase() }
 
+    fun entries(): List<Pair<String, Int>> = words.map { it.word to it.frequency }
+
     fun suggest(raw: String, learned: Map<String, Int> = emptyMap(), limit: Int = 8): List<Suggestion> {
         val typed = raw.lowercase()
         if (typed.isBlank()) return emptyList()

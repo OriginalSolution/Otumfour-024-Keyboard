@@ -1,0 +1,5 @@
+English frequencies in app/src/main/assets/dictionaries/en-freq.txt
+are derived from OpenSubtitles 2018 via FrequencyWords by Hermit Dave.
+https://github.com/hermitdave/FrequencyWords
+The word-list content is used under CC BY-SA 4.0.
+https://creativecommons.org/licenses/by-sa/4.0/

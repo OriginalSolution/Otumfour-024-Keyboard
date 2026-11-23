@@ -16,6 +16,9 @@ object ThemeArt {
     fun draw(canvas: Canvas, theme: ThemeId, width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
         when (theme) {
+            ThemeId.NIGHT, ThemeId.OTUMFUO, ThemeId.GOLD_REGALIA, ThemeId.YAA_PHOTO, ThemeId.ANOKYE_PHOTO ->
+                canvas.drawColor(Color.parseColor("#0D1016"))
+            ThemeId.DAY -> canvas.drawColor(Color.parseColor("#D5D8E0"))
             ThemeId.GOLDEN_STOOL -> royal(canvas, width.toFloat(), height.toFloat())
             ThemeId.KENTE -> kente(canvas, width.toFloat(), height.toFloat())
             ThemeId.ADINKRA -> adinkra(canvas, width.toFloat(), height.toFloat())

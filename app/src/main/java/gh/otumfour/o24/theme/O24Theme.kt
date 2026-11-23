@@ -11,6 +11,12 @@ enum class ThemeId(
     @StringRes val historyRes: Int,
     val jersey: Boolean = false,
 ) {
+    NIGHT("night", R.string.theme_night_title, R.string.theme_night_blurb, R.string.history_night),
+    DAY("day", R.string.theme_day_title, R.string.theme_day_blurb, R.string.history_day),
+    OTUMFUO("otumfuo", R.string.theme_otumfuo_title, R.string.theme_otumfuo_blurb, R.string.history_otumfuo),
+    GOLD_REGALIA("gold_regalia", R.string.theme_regalia_title, R.string.theme_regalia_blurb, R.string.history_regalia),
+    YAA_PHOTO("yaa_photo", R.string.theme_yaa_photo_title, R.string.theme_yaa_photo_blurb, R.string.history_yaa_photo),
+    ANOKYE_PHOTO("anokye_photo", R.string.theme_anokye_photo_title, R.string.theme_anokye_photo_blurb, R.string.history_anokye_photo),
     GOLDEN_STOOL("golden_stool", R.string.theme_golden_title, R.string.theme_golden_blurb, R.string.history_golden),
     KENTE("kente", R.string.theme_kente_title, R.string.theme_kente_blurb, R.string.history_kente),
     ADINKRA("adinkra", R.string.theme_adinkra_title, R.string.theme_adinkra_blurb, R.string.history_adinkra),
@@ -24,7 +30,7 @@ enum class ThemeId(
     ;
 
     companion object {
-        fun fromStorage(value: String?): ThemeId = entries.firstOrNull { it.storage == value } ?: GOLDEN_STOOL
+        fun fromStorage(value: String?): ThemeId = entries.firstOrNull { it.storage == value } ?: NIGHT
     }
 }
 
@@ -63,7 +69,41 @@ data class ThemeColors(
     val enterLabel: Int = 0,
     val boldLetters: Boolean = false,
     val piping: Int = 0,
+    val modern: Boolean = false,
+    val photoAsset: String? = null,
 )
+
+private fun modernTheme(id: ThemeId, light: Boolean, photo: String?): ThemeColors {
+    val night = !light
+    return ThemeColors(
+        id = id,
+        keyboardBg = Color.parseColor(if (night) "#0D1016" else "#D5D8E0"),
+        keyFill = Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
+        keyStroke = if (night) Color.argb(36, 255, 255, 255) else Color.argb(28, 15, 18, 28),
+        keyLabel = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
+        actionFill = Color.parseColor(if (night) "#141821" else "#E1E4EC"),
+        actionLabel = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
+        accentFill = Color.parseColor("#E11D2E"),
+        accentLabel = Color.parseColor("#FFFFFF"),
+        spaceFill = Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
+        spaceLabel = Color.parseColor(if (night) "#F0C94A" else "#8A5A00"),
+        suggestionBg = Color.parseColor(if (night) "#0D1016" else "#D5D8E0"),
+        suggestionText = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
+        toolbarBg = Color.parseColor(if (night) "#0D1016" else "#D5D8E0"),
+        pillFill = Color.parseColor(if (night) "#1A1F2A" else "#FFFFFF"),
+        pillText = Color.parseColor(if (night) "#F4F6FB" else "#12151C"),
+        micFill = Color.parseColor("#E11D2E"),
+        micLabel = Color.parseColor("#FFFFFF"),
+        micGlow = Color.parseColor("#F0C94A"),
+        pressed = Color.parseColor(if (night) "#2A3142" else "#F3E2A4"),
+        cornerDp = 12f,
+        spaceTitle = "Otumfour",
+        enterFill = Color.parseColor("#E11D2E"),
+        enterLabel = Color.parseColor("#FFFFFF"),
+        modern = true,
+        photoAsset = photo,
+    )
+}
 
 private fun argb(alpha: Int, hex: String): Int {
     val rgb = Color.parseColor(hex)
@@ -71,6 +111,12 @@ private fun argb(alpha: Int, hex: String): Int {
 }
 
 fun colorsFor(id: ThemeId): ThemeColors = when (id) {
+    ThemeId.NIGHT -> modernTheme(id, light = false, photo = null)
+    ThemeId.DAY -> modernTheme(id, light = true, photo = null)
+    ThemeId.OTUMFUO -> modernTheme(id, light = false, photo = "themes/otumfuo.webp")
+    ThemeId.GOLD_REGALIA -> modernTheme(id, light = false, photo = "themes/regalia.webp")
+    ThemeId.YAA_PHOTO -> modernTheme(id, light = false, photo = "themes/yaa.webp")
+    ThemeId.ANOKYE_PHOTO -> modernTheme(id, light = false, photo = "themes/anokye.webp")
     ThemeId.GOLDEN_STOOL -> ThemeColors(
         id = id,
         keyboardBg = Color.parseColor("#0C0A07"),

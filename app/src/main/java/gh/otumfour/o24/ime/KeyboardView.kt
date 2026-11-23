@@ -3,20 +3,32 @@ package gh.otumfour.o24.ime
 import android.content.Context
 import android.util.Log
 import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Path
+import android.graphics.Shader
 import android.media.AudioManager
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.content.res.ResourcesCompat
+import gh.otumfour.o24.R
+import gh.otumfour.o24.suggest.SwipeKey
+import gh.otumfour.o24.suggest.SwipeSample
 import gh.otumfour.o24.theme.GoldenStool
+import gh.otumfour.o24.theme.PhotoBackdrop
 import gh.otumfour.o24.theme.ThemeArt
 import gh.otumfour.o24.theme.ThemeColors
 import gh.otumfour.o24.theme.ThemeId
+import kotlin.math.hypot
 import kotlin.math.min
 
 class KeyboardView @JvmOverloads constructor(
@@ -48,8 +60,10 @@ class KeyboardView @JvmOverloads constructor(
 
     var onKey: (KeySpec) -> Unit = {}
     var onAlternate: (KeySpec) -> Unit = {}
+    var onSwipe: (List<SwipeSample>, List<SwipeKey>, Float) -> Unit = { _, _, _ -> }
     var hapticEnabled: Boolean = true
     var soundEnabled: Boolean = false
+    var swipeEnabled: Boolean = true
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -62,6 +76,22 @@ class KeyboardView @JvmOverloads constructor(
     private var pressed: KeySpec? = null
     private var longFired = false
     private var downTime = 0L
+    private var downX = 0f
+    private var downY = 0f
+    private var swiping = false
+    private var swipeHapticSent = false
+    private val trail = ArrayList<SwipeSample>()
+    private var trailUntil = 0L
+    private var splitMode = false
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val trailPath = Path()
+    private val outfit: Typeface? by lazy {
+        runCatching { ResourcesCompat.getFont(context, R.font.outfit_semibold) }.getOrNull()
+    }
 
     private val repeatRunnable = object : Runnable {
         override fun run() {
@@ -140,7 +170,8 @@ class KeyboardView @JvmOverloads constructor(
                 )
             }
             label.color = fg
-            label.isFakeBoldText = themeColors.boldLetters
+            label.typeface = outfit
+            label.isFakeBoldText = themeColors.boldLetters || themeColors.modern
             val wanted = when {
                 key.role == KeySpec.Role.SPACE -> dp(13f)
                 key.label.length > 2 -> dp(13f)
@@ -148,8 +179,14 @@ class KeyboardView @JvmOverloads constructor(
             }
             label.textSize = min(wanted, rect.height() * 0.46f)
             val baseline = rect.centerY() - (label.descent() + label.ascent()) / 2f
+            if (themeColors.modern && key.role == KeySpec.Role.SPACE) {
+                val textWidth = label.measureText(key.label)
+                drawKenteCap(canvas, rect.centerX() - textWidth / 2f - dp(16f), rect.centerY())
+                drawKenteCap(canvas, rect.centerX() + textWidth / 2f + dp(16f), rect.centerY())
+            }
             canvas.drawText(key.label, rect.centerX(), baseline, label)
         }
+        drawTrail(canvas)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -158,39 +195,68 @@ class KeyboardView @JvmOverloads constructor(
                 val key = hit(event.x, event.y) ?: return true
                 pressed = key
                 longFired = false
+                swiping = false
+                swipeHapticSent = false
                 downTime = event.eventTime
+                downX = event.x
+                downY = event.y
+                trail.clear()
+                trailUntil = 0L
+                trail.add(SwipeSample(event.x, event.y, event.eventTime))
                 parent?.requestDisallowInterceptTouchEvent(true)
                 if (key.repeat) {
                     onKey(key)
                     longFired = true
                     handler.postDelayed(repeatRunnable, 320L)
+                    tick()
                 } else if (key.alternate != null) {
                     handler.postDelayed(longRunnable, 380L)
-                }
-                if (hapticEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                if (soundEnabled) {
-                    context.getSystemService(AudioManager::class.java)
-                        ?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, 0.35f)
                 }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
-                val key = hit(event.x, event.y)
-                if (key != pressed) {
+                trail.add(SwipeSample(event.x, event.y, event.eventTime))
+                val travel = hypot(event.x - downX, event.y - downY)
+                val letter = pressed?.value?.length == 1 && pressed?.value?.get(0)?.isLetter() == true
+                if (!swiping && swipeEnabled && letter && travel > averageKeyWidth() * 1.5f) {
+                    swiping = true
                     handler.removeCallbacks(longRunnable)
                     handler.removeCallbacks(repeatRunnable)
-                    pressed = key
-                    invalidate()
+                    if (!swipeHapticSent) {
+                        swipeHapticSent = true
+                        tick()
+                    }
                 }
+                if (!swiping) {
+                    val key = hit(event.x, event.y)
+                    if (key != pressed) {
+                        handler.removeCallbacks(longRunnable)
+                        handler.removeCallbacks(repeatRunnable)
+                        pressed = key
+                    }
+                }
+                invalidate()
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(longRunnable)
                 handler.removeCallbacks(repeatRunnable)
                 val key = pressed
-                if (event.actionMasked == MotionEvent.ACTION_UP && key != null && !longFired && hit(event.x, event.y) == key) {
+                if (event.actionMasked == MotionEvent.ACTION_UP && swiping && trail.size > 1) {
+                    trail.add(SwipeSample(event.x, event.y, event.eventTime))
+                    tick()
+                    onSwipe(trail.toList(), letterKeys(), averageKeyWidth())
+                    trailUntil = SystemClock.uptimeMillis() + 300L
+                    handler.postDelayed({ invalidate() }, 16L)
+                } else if (event.actionMasked == MotionEvent.ACTION_UP && key != null && !longFired && hit(event.x, event.y) == key) {
+                    tick()
+                    if (soundEnabled) {
+                        context.getSystemService(AudioManager::class.java)
+                            ?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, 0.35f)
+                    }
                     onKey(key)
                 }
                 pressed = null
+                swiping = false
                 invalidate()
             }
         }
@@ -251,7 +317,18 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun layoutKeys() {
         placed.clear()
+        splitMode = false
         if (width == 0 || height == 0 || rows.isEmpty()) return
+        val halves = if (resources.configuration.screenWidthDp >= 600) KeyboardModel.splitRows(rows) else null
+        if (halves != null) {
+            splitMode = true
+            layoutHalves(halves.first, halves.second, halves.third)
+        } else {
+            layoutJoined()
+        }
+    }
+
+    private fun layoutJoined() {
         val gap = dp(5f)
         val pad = dp(4f)
         val topExtra = if (theme == ThemeId.ROYAL_CREST) dp(14f) else 0f
@@ -259,23 +336,57 @@ class KeyboardView @JvmOverloads constructor(
         val usableH = height - pad * 2 - topExtra - bottomInset - gap * (rows.size - 1)
         val rowH = (usableH / rows.size).coerceAtMost(dp(58f))
         val cap = keyCap()
-        val split = resources.configuration.screenWidthDp >= 840
         var y = pad + topExtra
         rows.forEachIndexed { index, row ->
-            val weight = row.sumOf { it.weight.toDouble() }.toFloat().coerceAtLeast(1f)
-            val inner = width - pad * 2 - gap * (row.size - 1)
-            val widths = row.map { key -> min(inner * (key.weight / weight), cap) }
-            val splitGap = if (split && row.size >= 6) dp(36f) else 0f
-            val used = widths.sum() + gap * (row.size - 1) + splitGap
-            var x = ((width - used) / 2f).coerceAtLeast(pad)
-            val mid = row.size / 2
-            row.forEachIndexed { keyIndex, key ->
-                if (split && keyIndex == mid) x += splitGap
-                val w = widths[keyIndex]
-                placed.add(Placed(key, RectF(x, y, x + w, y + rowH), index))
-                x += w + gap
-            }
+            placeRow(row, pad, width - pad, y, rowH, gap, cap, index)
             y += rowH + gap
+        }
+    }
+
+    private fun layoutHalves(
+        extra: List<List<KeySpec>>,
+        left: List<List<KeySpec>>,
+        right: List<List<KeySpec>>,
+    ) {
+        val gap = dp(6f)
+        val pad = dp(4f)
+        val gutter = dp(36f)
+        val bottomInset = gestureInset()
+        val count = extra.size + maxOf(left.size, right.size).coerceAtLeast(1)
+        val usableH = height - pad * 2 - bottomInset - gap * (count - 1)
+        val rowH = (usableH / count).coerceAtMost(dp(58f))
+        val cap = keyCap()
+        val mid = width / 2f
+        var y = pad
+        extra.forEachIndexed { index, row ->
+            placeRow(row, pad, width - pad, y, rowH, gap, cap, index)
+            y += rowH + gap
+        }
+        for (index in 0 until maxOf(left.size, right.size)) {
+            left.getOrNull(index)?.let { placeRow(it, pad, mid - gutter / 2f, y, rowH, gap, cap, index) }
+            right.getOrNull(index)?.let { placeRow(it, mid + gutter / 2f, width - pad, y, rowH, gap, cap, index) }
+            y += rowH + gap
+        }
+    }
+
+    private fun placeRow(
+        row: List<KeySpec>,
+        left: Float,
+        right: Float,
+        y: Float,
+        rowH: Float,
+        gap: Float,
+        cap: Float,
+        index: Int,
+    ) {
+        val weight = row.sumOf { it.weight.toDouble() }.toFloat().coerceAtLeast(1f)
+        val inner = (right - left - gap * (row.size - 1)).coerceAtLeast(1f)
+        var x = left
+        row.forEach { key ->
+            val raw = inner * (key.weight / weight)
+            val w = if (key.role == KeySpec.Role.LETTER) min(raw, cap) else raw
+            placed.add(Placed(key, RectF(x, y, x + w, y + rowH), index))
+            x += w + gap
         }
     }
 
@@ -311,12 +422,76 @@ class KeyboardView @JvmOverloads constructor(
         try {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            ThemeArt.draw(canvas, theme, width, height)
+            val photo = colors?.photoAsset
+            if (photo != null) PhotoBackdrop.draw(context, canvas, photo, width, height)
+            else ThemeArt.draw(canvas, theme, width, height)
             art = bitmap
             artCanvas = canvas
         } catch (error: Throwable) {
             Log.e("O24Keyboard", "Theme bitmap failed at ${width}x$height", error)
         }
+    }
+
+    private fun letterKeys(): List<SwipeKey> = placed.mapNotNull { item ->
+        val value = item.key.value
+        if (value.length == 1 && value[0].isLetter()) {
+            SwipeKey(value[0].lowercaseChar(), item.rect.centerX(), item.rect.centerY())
+        } else {
+            null
+        }
+    }
+
+    private fun averageKeyWidth(): Float {
+        val letters = placed.filter { it.key.value.length == 1 && it.key.value[0].isLetter() }
+        if (letters.isEmpty()) return dp(48f)
+        return letters.map { it.rect.width() }.average().toFloat()
+    }
+
+    private fun tick() {
+        if (hapticEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
+
+    private fun drawKenteCap(canvas: Canvas, cx: Float, cy: Float) {
+        val strip = dp(3.2f)
+        val height = dp(14f)
+        val colors = intArrayOf(Color.parseColor("#E11D2E"), Color.parseColor("#F0C94A"), Color.parseColor("#3DDC97"))
+        colors.forEachIndexed { index, color ->
+            fill.color = color
+            val left = cx - strip * 1.5f + index * strip
+            canvas.drawRoundRect(left, cy - height / 2f, left + strip - dp(0.6f), cy + height / 2f, dp(1f), dp(1f), fill)
+        }
+    }
+
+    private fun drawTrail(canvas: Canvas) {
+        if (trail.size < 2) return
+        val now = SystemClock.uptimeMillis()
+        val alpha = if (trailUntil == 0L) 1f else ((trailUntil - now) / 300f).coerceIn(0f, 1f)
+        if (alpha <= 0f) {
+            trail.clear()
+            return
+        }
+        if (trailUntil != 0L) handler.postDelayed({ invalidate() }, 16L)
+        trailPath.reset()
+        trailPath.moveTo(trail[0].x, trail[0].y)
+        for (sample in trail.drop(1)) trailPath.lineTo(sample.x, sample.y)
+        val last = trail.last()
+        val first = trail.first()
+        trailPaint.strokeWidth = dp(16f)
+        trailPaint.shader = null
+        trailPaint.color = Color.argb((70 * alpha).toInt(), 225, 29, 46)
+        canvas.drawPath(trailPath, trailPaint)
+        trailPaint.strokeWidth = dp(5.5f)
+        trailPaint.shader = LinearGradient(
+            first.x, first.y, last.x, last.y,
+            intArrayOf(Color.parseColor("#FF4D5A"), Color.parseColor("#FFB703"), Color.parseColor("#F0C94A")),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        trailPaint.alpha = (255 * alpha).toInt()
+        canvas.drawPath(trailPath, trailPaint)
+        trailPaint.shader = null
+        fill.color = Color.argb((255 * alpha).toInt(), 255, 246, 200)
+        canvas.drawCircle(last.x, last.y, dp(7f), fill)
     }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density

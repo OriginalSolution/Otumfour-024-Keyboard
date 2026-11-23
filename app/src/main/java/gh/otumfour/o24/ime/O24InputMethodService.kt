@@ -27,6 +27,11 @@ import gh.otumfour.o24.lang.KeyboardLanguage
 import gh.otumfour.o24.suggest.Autocorrect
 import gh.otumfour.o24.suggest.Lexicon
 import gh.otumfour.o24.suggest.Suggestion
+import gh.otumfour.o24.suggest.SwipeDecoder
+import gh.otumfour.o24.suggest.SwipeKey
+import gh.otumfour.o24.suggest.SwipeSample
+import gh.otumfour.o24.suggest.TypingEdits
+import gh.otumfour.o24.theme.PhotoBackdrop
 import gh.otumfour.o24.theme.ThemeId
 import gh.otumfour.o24.theme.colorsFor
 import gh.otumfour.o24.ui.MainActivity
@@ -55,6 +60,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         aiModel = "",
         aiKey = "",
         aiEnabled = true,
+        swipeTyping = true,
     )
 
     private var page = BoardPage.LETTERS
@@ -67,10 +73,12 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private var keyboard: KeyboardView? = null
     private var suggestionViews: List<TextView> = emptyList()
     private var statusView: TextView? = null
+    private var hairline: View? = null
     private var toneRow: LinearLayout? = null
     private var languageButton: Button? = null
     private var popup: PopupWindow? = null
     private var undo: Undo? = null
+    private var swipeCommitted: String? = null
     private val rejected = HashSet<String>()
     private var lastChar = ""
     private var lastCharAt = 0L
@@ -170,6 +178,14 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             setBackgroundColor(colors.keyboardBg)
         }
         root = column
+        hairline = View(this).apply {
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(0x00000000, 0xFFE11D2E.toInt(), 0xFFFFB703.toInt(), 0xFFE11D2E.toInt(), 0x00000000),
+            )
+            visibility = if (colors.modern) View.VISIBLE else View.GONE
+        }
+        column.addView(hairline, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(2)))
 
         statusView = TextView(this).apply {
             setTextColor(colors.suggestionText)
@@ -238,6 +254,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         keyboard = KeyboardView(this).also { board ->
         board.onKey = { key -> onKey(key) }
         board.onAlternate = { key -> onAlternate(key) }
+        board.onSwipe = { samples, keys, width -> onSwipe(samples, keys, width) }
         board.hapticEnabled = settings.haptic
             column.addView(board, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
@@ -275,13 +292,17 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         board.colors = colors
         board.hapticEnabled = settings.haptic
         board.soundEnabled = settings.keySound
+        board.swipeEnabled = settings.swipeTyping && !suppressSuggest
         board.rows = KeyboardModel.rows(page, settings.language, shift, enterLabel, colors.spaceTitle)
-        root?.setBackgroundColor(colors.keyboardBg)
-        suggestionViews.forEach {
-            it.setTextColor(colors.suggestionText)
-            it.setBackgroundColor(colors.suggestionBg)
+        val photo = colors.photoAsset
+        if (photo != null) root?.background = PhotoBackdrop.drawable(this, photo)
+        else root?.setBackgroundColor(colors.keyboardBg)
+        hairline?.visibility = if (colors.modern) View.VISIBLE else View.GONE
+        suggestionViews.forEachIndexed { index, view ->
+            styleChip(view, index == 0 && view.text.isNotEmpty())
         }
-        (suggestionViews.firstOrNull()?.parent as? View)?.setBackgroundColor(colors.suggestionBg)
+        val strip = if (photo != null) android.graphics.Color.TRANSPARENT else colors.suggestionBg
+        (suggestionViews.firstOrNull()?.parent as? View)?.setBackgroundColor(strip)
         statusView?.setTextColor(colors.suggestionText)
         styleToolbar()
         languageButton?.text = settings.language.shortLabel
@@ -358,6 +379,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         lastChar = value
         lastCharAt = now
         undo = null
+        swipeCommitted = null
         if (value.length == 1 && value[0] in ".!?,") {
             correctCurrentWord(ic, trailing = value)
             if (settings.autoCapitalise && value[0] in ".!?") shift = ShiftState.ONCE
@@ -370,8 +392,18 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     private fun commitSpace(ic: InputConnection) {
-        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
-        if (before == " ") return
+        val before = ic.getTextBeforeCursor(8, 0)?.toString().orEmpty()
+        if (settings.autoCapitalise && TypingEdits.doubleSpace(before)) {
+            ic.deleteSurroundingText(1, 0)
+            ic.commitText(". ", 1)
+            shift = ShiftState.ONCE
+            undo = null
+            swipeCommitted = null
+            reloadKeyboard()
+            refreshSuggestions()
+            return
+        }
+        if (before.endsWith(" ")) return
         val word = currentWord()
         if (settings.autoCapitalise && word == "i") {
             ic.deleteSurroundingText(1, 0)
@@ -385,7 +417,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private fun correctCurrentWord(ic: InputConnection, trailing: String) {
         val word = currentWord()
-        val known = wordIsKnown(word)
+        val beforeWord = ic.getTextBeforeCursor(word.length + 24, 0)?.toString().orEmpty().dropLast(word.length)
+        val known = wordIsKnown(word) || TypingEdits.capitalisedName(word, beforeWord)
         val choice = if (!suppressSuggest && settings.autocorrect) {
             Lexicon.autocorrect(word, ranked, known, rejected)
         } else {
@@ -396,6 +429,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             val written = Lexicon.matchCase(word, choice)
             ic.commitText(written + trailing, 1)
             undo = Undo(word, written)
+            swipeCommitted = null
             learned.learn(settings.language.code, written)
         } else {
             if (!suppressSuggest && word.length >= 3 && !known) learned.learn(settings.language.code, word)
@@ -612,10 +646,11 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         shown = Autocorrect.display(word, ranked).map { suggestion ->
             suggestion?.copy(word = Lexicon.matchCase(word, suggestion.word))
         }
+        swipeCommitted = null
         suggestionViews.forEachIndexed { index, view ->
             val suggestion = shown.getOrNull(index)
             view.text = suggestion?.word.orEmpty()
-            view.setTypeface(null, if (index == 0 && suggestion != null) Typeface.BOLD else Typeface.NORMAL)
+            styleChip(view, index == 0 && suggestion != null)
         }
     }
 
@@ -623,11 +658,68 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val suggestion = shown.getOrNull(index) ?: return
         val ic = currentInputConnection ?: return
         val word = currentWord()
+        val committed = swipeCommitted
+        if (word.isEmpty() && committed != null) {
+            val token = "$committed "
+            val before = ic.getTextBeforeCursor(token.length, 0)?.toString().orEmpty()
+            if (before == token) {
+                ic.deleteSurroundingText(token.length, 0)
+                ic.commitText(suggestion.word + " ", 1)
+                swipeCommitted = suggestion.word
+                return
+            }
+        }
         if (word.isNotEmpty()) ic.deleteSurroundingText(word.length, 0)
-        val written = Lexicon.matchCase(word, suggestion.word)
+        val written = Lexicon.matchCase(word.ifEmpty { suggestion.word }, suggestion.word)
         ic.commitText(written, 1)
         learned.learn(settings.language.code, written)
+        swipeCommitted = null
         finishWord()
+    }
+
+    private fun onSwipe(samples: List<SwipeSample>, keys: List<SwipeKey>, keyWidth: Float) {
+        if (!settings.swipeTyping || suppressSuggest) return
+        val ic = currentInputConnection ?: return
+        val matches = SwipeDecoder.rank(samples, keys, keyWidth, lexicon(settings.language).entries())
+        val best = matches.firstOrNull() ?: return
+        val pending = currentWord()
+        if (pending.isNotEmpty()) ic.deleteSurroundingText(pending.length, 0)
+        val written = when (shift) {
+            ShiftState.CAPS -> best.uppercase()
+            ShiftState.ONCE -> Lexicon.matchCase(best.replaceFirstChar { it.titlecase() }, best)
+            ShiftState.OFF -> best
+        }
+        ic.commitText("$written ", 1)
+        swipeCommitted = written
+        undo = null
+        if (shift == ShiftState.ONCE) shift = ShiftState.OFF
+        ranked = emptyList()
+        shown = matches.take(3).map { Suggestion(Lexicon.matchCase(written, it), 0, 0, false) }
+        suggestionViews.forEachIndexed { index, view ->
+            val suggestion = shown.getOrNull(index)
+            view.text = suggestion?.word.orEmpty()
+            styleChip(view, index == 0 && suggestion != null)
+        }
+        reloadKeyboard()
+    }
+
+    private fun styleChip(view: TextView, primary: Boolean) {
+        val colors = colorsFor(settings.theme)
+        view.typeface = runCatching {
+            androidx.core.content.res.ResourcesCompat.getFont(this, gh.otumfour.o24.R.font.outfit_semibold)
+        }.getOrNull()
+        if (!colors.modern) {
+            view.setTextColor(colors.suggestionText)
+            view.setBackgroundColor(colors.suggestionBg)
+            return
+        }
+        view.setTextColor(if (primary) Color.parseColor("#F0C94A") else colors.suggestionText)
+        view.background = GradientDrawable().apply {
+            cornerRadius = dp(24).toFloat()
+            setColor(if (primary) 0x1AF0C94A else colors.keyFill)
+            val stroke = if (primary) Color.parseColor("#F0C94A") else colors.keyStroke
+            setStroke(dp(if (primary) 2 else 1), stroke)
+        }
     }
 
     private fun cycleLanguage() {
@@ -682,7 +774,14 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private fun lexicon(language: KeyboardLanguage): Lexicon = lexicons.getOrPut(language.code) {
         val text = assets.open("dictionaries/${language.asset}").bufferedReader(Charsets.UTF_8).use { it.readText() }
-        Lexicon.parse(text)
+        val extra = if (language == KeyboardLanguage.ENGLISH) {
+            runCatching {
+                assets.open("dictionaries/en-freq.txt").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            }.getOrDefault("")
+        } else {
+            ""
+        }
+        Lexicon.parse(text + "\n" + extra)
     }
 
     private fun pill(text: String): Button = Button(this).apply {

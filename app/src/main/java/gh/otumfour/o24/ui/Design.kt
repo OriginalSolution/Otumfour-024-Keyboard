@@ -16,15 +16,15 @@ import gh.otumfour.o24.R
 import kotlin.math.min
 
 object O24Color {
-    const val INK = "#1A1408"
-    const val BG = "#0C0A07"
-    const val CARD = "#1A160F"
-    const val GOLD = "#E8B52D"
-    const val GOLD_SOFT = "#F3D37A"
-    const val CREAM = "#F6F1E4"
-    const val MUTED = "#CDBF98"
-    const val GREEN = "#0E7A3A"
-    const val RED = "#8C1D18"
+    const val INK = "#12151C"
+    const val BG = "#07080C"
+    const val CARD = "#12151C"
+    const val GOLD = "#F0C94A"
+    const val GOLD_SOFT = "#FFB703"
+    const val CREAM = "#F4F6FB"
+    const val MUTED = "#949BAB"
+    const val GREEN = "#3DDC97"
+    const val RED = "#E11D2E"
 }
 
 fun o24Color(hex: String): Int = Color.parseColor(hex)

@@ -16,6 +16,7 @@ data class O24Settings(
     val aiModel: String,
     val aiKey: String,
     val aiEnabled: Boolean,
+    val swipeTyping: Boolean = true,
 )
 
 class SettingsStore(context: Context) {
@@ -38,6 +39,7 @@ class SettingsStore(context: Context) {
             aiModel = prefs.getString(KEY_AI_MODEL, "").orEmpty().trim(),
             aiKey = prefs.getString(KEY_AI_KEY, "").orEmpty().trim(),
             aiEnabled = prefs.getBoolean(KEY_AI_ENABLED, true),
+            swipeTyping = prefs.getBoolean(KEY_SWIPE, true),
         )
     }
 
@@ -73,6 +75,7 @@ class SettingsStore(context: Context) {
             .putString(KEY_AI_MODEL, next.aiModel)
             .putString(KEY_AI_KEY, next.aiKey)
             .putBoolean(KEY_AI_ENABLED, next.aiEnabled)
+            .putBoolean(KEY_SWIPE, next.swipeTyping)
             .apply()
     }
 
@@ -97,6 +100,7 @@ class SettingsStore(context: Context) {
         const val KEY_AI_MODEL = "ai_model"
         const val KEY_AI_KEY = "ai_key"
         const val KEY_AI_ENABLED = "ai_enabled"
+        const val KEY_SWIPE = "swipe"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_ONBOARDING_PAGE = "onboarding_page"
         const val KEY_DEVELOPER = "developer"
