@@ -90,7 +90,10 @@ jobs:
 
             ## Features
             - QWERTY, shift and caps, numbers and symbols, emoji, backspace, and enter
+            - Swipe typing, with a red-to-gold trail. Autocorrect on space, undone by the next backspace
+            - Night and Day, the ten drawn themes, and four photograph themes
             - Spacebar labelled Otumfour, or OTUMFOUR on the Sika Dwa Kofi theme
+            - On a wide screen the keyboard splits, as on an unfolded fold
             - Suggestion bar with three candidates. Autocorrect keeps known words and only replaces a one-step slip of a frequent word. Backspace undoes it
             - AI rewrite and translate through Otumfour's server, with no key in the app. Text is sent only when you tap AI or Translate. Settings is an on/off switch
             - Onboarding, settings, and an About page for Otumfuo

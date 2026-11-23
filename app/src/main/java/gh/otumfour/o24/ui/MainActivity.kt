@@ -385,6 +385,9 @@ class MainActivity : AppCompatActivity() {
         addView(toggleCard(getString(R.string.typing_autocorrect), getString(R.string.typing_autocorrect_help), store.get().autocorrect) { checked ->
             store.update { it.copy(autocorrect = checked) }
         })
+        addView(toggleCard(getString(R.string.typing_swipe), getString(R.string.typing_swipe_help), store.get().swipeTyping) { checked ->
+            store.update { it.copy(swipeTyping = checked) }
+        })
         addView(toggleCard(getString(R.string.typing_caps), getString(R.string.typing_caps_help), store.get().autoCapitalise) { checked ->
             store.update { it.copy(autoCapitalise = checked) }
         })

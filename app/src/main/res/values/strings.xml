@@ -64,6 +64,8 @@
     <string name="typing_haptic_help">A short tap when a key is pressed.</string>
     <string name="typing_sound">Key sound</string>
     <string name="typing_sound_help">The phone’s keyboard click, quietly.</string>
+    <string name="typing_swipe">Swipe typing</string>
+    <string name="typing_swipe_help">Glide across keys to write a word. A pause or a loop doubles a letter.</string>
     <string name="ai_example_formal_title">Make it formal</string>
     <string name="ai_example_formal_body">“can you send it today” can become a fuller, more formal line.</string>
     <string name="ai_example_short_title">Make it shorter</string>
@@ -107,6 +109,24 @@
     <string name="jersey_note">Original kits in club and national colours. Not official crests, badges, or trademarked artwork.</string>
     <string name="onboarding_finish">Save theme and continue</string>
 
+    <string name="theme_night_title">Night</string>
+    <string name="theme_night_blurb">Dark keys, a red enter key, and an Otumfour space bar.</string>
+    <string name="theme_day_title">Day</string>
+    <string name="theme_day_blurb">Light keys with the same red enter key.</string>
+    <string name="theme_otumfuo_title">Otumfuo Osei Tutu II</string>
+    <string name="theme_otumfuo_blurb">The Asantehene, behind the keys.</string>
+    <string name="theme_regalia_title">Gold Regalia</string>
+    <string name="theme_regalia_blurb">Asante royal gold.</string>
+    <string name="theme_yaa_photo_title">Yaa Asantewaa</string>
+    <string name="theme_yaa_photo_blurb">A historic photograph, behind the keys.</string>
+    <string name="theme_anokye_photo_title">Okomfo Anokye</string>
+    <string name="theme_anokye_photo_blurb">The statue at Kumasi, behind the keys.</string>
+    <string name="history_night">Night is the Otumfour keyboard: dark surfaces, a red enter key, and a space bar marked in red, gold, and green. 024 appears only as a small mark, never as the name of the keyboard.</string>
+    <string name="history_day">Day is the same keyboard in light colours, for bright rooms. The enter key stays red.</string>
+    <string name="history_otumfuo">Otumfuo Nana Osei Tutu II is the Asantehene, enstooled on 26 April 1999. This photograph is used only as the keyboard background. Otumfour is not a publication of Manhyia Palace.</string>
+    <string name="history_regalia">Gold regalia of the Asante court: the stool’s world of gold, worked metal, and ceremony. The photograph sits behind the keys and does not replace them.</string>
+    <string name="history_yaa_photo">Nana Yaa Asantewaa, Queen Mother of Ejisu, led Asante in the War of the Golden Stool in 1900. This historic photograph is the keyboard background only. It does not depict a living person and it is not a palace publication.</string>
+    <string name="history_anokye_photo">A statue of Ɔkɔmfo Anokye, the priest remembered with Osei Tutu I at the founding of Asanteman and the Golden Stool. The photograph is the keyboard background only.</string>
     <string name="theme_golden_title">Golden Stool Royal</string>
     <string name="theme_golden_blurb">Black keys, gold edges, and a woven gold ground.</string>
     <string name="theme_kente_title">Kente Vibrant</string>

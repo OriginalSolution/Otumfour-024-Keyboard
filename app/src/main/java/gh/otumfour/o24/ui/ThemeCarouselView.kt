@@ -171,6 +171,9 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
     }
 
     private fun swatch(theme: ThemeId): Int = when (theme) {
+        ThemeId.NIGHT, ThemeId.OTUMFUO, ThemeId.GOLD_REGALIA, ThemeId.YAA_PHOTO, ThemeId.ANOKYE_PHOTO ->
+            Color.parseColor("#0D1016")
+        ThemeId.DAY -> Color.parseColor("#D5D8E0")
         ThemeId.GOLDEN_STOOL -> Color.parseColor("#E8B52D")
         ThemeId.KENTE -> Color.parseColor("#0E7A3A")
         ThemeId.ADINKRA -> Color.parseColor("#3A3A3A")
