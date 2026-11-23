@@ -435,7 +435,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val beforeWord = ic.getTextBeforeCursor(word.length + 24, 0)?.toString().orEmpty().dropLast(word.length)
         val known = wordIsKnown(word) || TypingEdits.capitalisedName(word, beforeWord)
         val choice = if (!suppressSuggest && settings.autocorrect) {
-            Lexicon.autocorrect(word, ranked, known, rejected)
+            correction(word, known)
         } else {
             null
         }
@@ -447,10 +447,25 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             swipeCommitted = null
             learned.learn(settings.language.code, written)
         } else {
-            if (!suppressSuggest && word.length >= 3 && !known) learned.learn(settings.language.code, word)
+            if (shouldRemember(word)) learned.learn(settings.language.code, word)
             ic.commitText(trailing, 1)
             undo = null
         }
+    }
+
+    /** The suggestion bar can still be empty on the first letters. Ask the word list directly. */
+    private fun correction(word: String, known: Boolean): String? {
+        val live = Lexicon.autocorrect(word, ranked, known, rejected)
+        if (live != null) return live
+        val fresh = lexicon(settings.language).suggest(word, learned.load(settings.language.code))
+        return Lexicon.autocorrect(word, fresh, known, rejected)
+    }
+
+    private fun shouldRemember(word: String): Boolean {
+        if (suppressSuggest || word.length < 3 || wordIsKnown(word)) return false
+        if (!settings.autocorrect) return true
+        val suggestions = lexicon(settings.language).suggest(word)
+        return Autocorrect.shouldLearn(word, suggestions)
     }
 
     private fun wordIsKnown(word: String): Boolean {
