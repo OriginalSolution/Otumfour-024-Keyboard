@@ -42,6 +42,7 @@ import gh.otumfour.o24.suggest.TypingEdits
 import gh.otumfour.o24.theme.PhotoBackdrop
 import gh.otumfour.o24.theme.ThemeId
 import gh.otumfour.o24.theme.colorsFor
+import androidx.core.view.WindowCompat
 import gh.otumfour.o24.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +99,11 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             store = SettingsStore(this)
             learned = LearnedWords(this)
             settings = store.get()
-            window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
+            window?.window?.let { imeWindow ->
+                // Keep the keyboard above the navigation bar instead of resizing when the inset flickers.
+                WindowCompat.setDecorFitsSystemWindows(imeWindow, true)
+                imeWindow.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
+            }
             getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(this)
         } catch (error: Throwable) {
@@ -121,6 +126,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         try {
             super.onStartInput(attribute, restarting)
+            clearTransientUi()
         } catch (error: Throwable) {
             rememberFailure("onStartInput", error)
         }
@@ -136,6 +142,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             shift = if (wantsCaps(info)) ShiftState.ONCE else ShiftState.OFF
             undo = null
             rejected.clear()
+            clearTransientUi()
+            keyboard?.swipeEnabled = settings.swipeTyping && !suppressSuggest
             reloadKeyboard()
             refreshSuggestions()
         } catch (error: Throwable) {
@@ -145,7 +153,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     override fun onFinishInputView(finishingInput: Boolean) {
         popup?.dismiss()
+        clearTransientUi()
         super.onFinishInputView(finishingInput)
+    }
+
+    private fun clearTransientUi() {
+        hideChoices()
+        showStatus("")
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {

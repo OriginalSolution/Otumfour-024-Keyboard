@@ -66,7 +66,7 @@
     <string name="typing_sound">Key sound</string>
     <string name="typing_sound_help">The phone’s keyboard click, quietly.</string>
     <string name="typing_swipe">Swipe typing</string>
-    <string name="typing_swipe_help">Glide across keys to write a word. A pause or a loop doubles a letter.</string>
+    <string name="typing_swipe_help">Glide from the first letter to the last. Otumfour offers the closest word, and other matches stay above the keys.</string>
     <string name="ai_example_formal_title">Make it formal</string>
     <string name="ai_example_formal_body">“can you send it today” can become a fuller, more formal line.</string>
     <string name="ai_example_short_title">Make it shorter</string>

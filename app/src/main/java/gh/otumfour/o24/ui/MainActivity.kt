@@ -246,7 +246,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun openSection(index: Int) {
         val pages = pager
-        if (pages != null) pages.setCurrentItem(index, true) else showDetail(index)
+        val target = SettingsPages.clamp(index)
+        if (pages != null) {
+            val smooth = SettingsPages.useSmoothScroll(pages.currentItem, target)
+            pages.setCurrentItem(target, smooth)
+        } else {
+            showDetail(target)
+        }
     }
 
     private fun pageAt(index: Int): View = when (index) {
@@ -606,15 +612,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private inner class PageAdapter : RecyclerView.Adapter<PageAdapter.Holder>() {
-        inner class Holder(view: View) : RecyclerView.ViewHolder(view)
+        inner class Holder(val frame: FrameLayout) : RecyclerView.ViewHolder(frame)
         override fun getItemCount(): Int = PAGE_COUNT
-        override fun getItemViewType(position: Int): Int = position
+        override fun getItemViewType(position: Int): Int = SettingsPages.clamp(position)
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-            val view = pageAt(viewType)
-            view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            return Holder(view)
+            val frame = FrameLayout(this@MainActivity)
+            frame.layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            return Holder(frame)
         }
-        override fun onBindViewHolder(holder: Holder, position: Int) = Unit
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val page = SettingsPages.clamp(position)
+            if (holder.frame.tag == page && holder.frame.childCount > 0) return
+            holder.frame.removeAllViews()
+            val content = pageAt(page)
+            content.layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+            holder.frame.addView(content)
+            holder.frame.tag = page
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -625,7 +645,7 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_OPEN = "open"
         const val EXTRA_THEME = "theme_index"
         private const val STATE_PAGE = "page"
-        private const val PAGE_COUNT = 7
+        private const val PAGE_COUNT = SettingsPages.COUNT
         private val PAGE_TITLES = intArrayOf(
             R.string.settings_home,
             R.string.settings_theme,
