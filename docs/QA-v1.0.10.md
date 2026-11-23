@@ -48,3 +48,19 @@ Three directions only, each with a 1024×500 feature graphic, a 1080×1920 phone
 - `/opt/cursor/artifacts/play-store-concepts/concept-3/` Clean light, with the capture inside a drawn phone frame
 
 The supplied logo video was not bundled and was not played. It is a still of the splash artwork.
+
+## Follow-up on the same build
+
+A later pass opened the gear panel on the live keyboard. The screen reader saw Themes, Otumfuo Osei Tutu, Gold Regalia, Yaa Asantewaa, and Settings. Tapping the gold Settings button opened Settings home (`/opt/cursor/artifacts/v110-screens/settings-from-gear.png`). That is a pass for the gear opening Settings.
+
+The same emulator then stopped drawing. System UI, and then the system process, reported that they were not responding. Recreating the emulator (software rendering, a wiped data image, and a second boot) reached the same System UI dialog before the keyboard could be driven again. Theme-by-theme shots, a fresh teh/the undo, swipe, AI, Translate, and the wide split keyboard were not captured after that. v1.0.10 stays untagged.
+
+Royal Kente store pieces that use real captures:
+
+- `/opt/cursor/artifacts/play-store/icon-512.png`
+- `/opt/cursor/artifacts/play-store/feature-1024x500.png` (tagline: Gold, kente, and your language.)
+- `/opt/cursor/artifacts/play-store/listing.md`
+- `/opt/cursor/artifacts/play-store/phone-photo-behind-keys.png`
+- `/opt/cursor/artifacts/play-store/phone-settings-from-gear.png`
+
+The other phone captions and the tablet sizes are not in that folder. They need captures this emulator did not keep on screen.
