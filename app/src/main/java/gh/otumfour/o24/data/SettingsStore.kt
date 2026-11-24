@@ -2,6 +2,7 @@ package gh.otumfour.o24.data
 
 import android.content.Context
 import gh.otumfour.o24.lang.KeyboardLanguage
+import gh.otumfour.o24.theme.BackgroundStrength
 import gh.otumfour.o24.theme.ThemeId
 import gh.otumfour.o24.theme.ThemeMigration
 
@@ -18,6 +19,10 @@ data class O24Settings(
     val aiKey: String,
     val aiEnabled: Boolean,
     val swipeTyping: Boolean = true,
+    val keyHeight: KeyHeight = KeyHeight.NORMAL,
+    val letterSize: LetterSize = LetterSize.NORMAL,
+    val backgroundStrength: BackgroundStrength = BackgroundStrength.SOFT,
+    val keyPreview: Boolean = true,
 )
 
 class SettingsStore(context: Context) {
@@ -49,6 +54,10 @@ class SettingsStore(context: Context) {
             aiKey = prefs.getString(KEY_AI_KEY, "").orEmpty().trim(),
             aiEnabled = prefs.getBoolean(KEY_AI_ENABLED, true),
             swipeTyping = prefs.getBoolean(KEY_SWIPE, true),
+            keyHeight = KeyHeight.fromStorage(prefs.getString(KEY_KEY_HEIGHT, null)),
+            letterSize = LetterSize.fromStorage(prefs.getString(KEY_LETTER_SIZE, null)),
+            backgroundStrength = BackgroundStrength.fromStorage(prefs.getString(KEY_BACKGROUND, null)),
+            keyPreview = prefs.getBoolean(KEY_PREVIEW, true),
         )
     }
 
@@ -85,6 +94,10 @@ class SettingsStore(context: Context) {
             .putString(KEY_AI_KEY, next.aiKey)
             .putBoolean(KEY_AI_ENABLED, next.aiEnabled)
             .putBoolean(KEY_SWIPE, next.swipeTyping)
+            .putString(KEY_KEY_HEIGHT, next.keyHeight.storage)
+            .putString(KEY_LETTER_SIZE, next.letterSize.storage)
+            .putString(KEY_BACKGROUND, next.backgroundStrength.storage)
+            .putBoolean(KEY_PREVIEW, next.keyPreview)
             .commit()
     }
 
@@ -111,6 +124,10 @@ class SettingsStore(context: Context) {
         const val KEY_AI_KEY = "ai_key"
         const val KEY_AI_ENABLED = "ai_enabled"
         const val KEY_SWIPE = "swipe"
+        const val KEY_KEY_HEIGHT = "key_height"
+        const val KEY_LETTER_SIZE = "letter_size"
+        const val KEY_BACKGROUND = "background_strength"
+        const val KEY_PREVIEW = "key_preview"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_ONBOARDING_PAGE = "onboarding_page"
         const val KEY_DEVELOPER = "developer"

@@ -12,18 +12,27 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.widget.PopupWindow
+import android.widget.TextView
 import androidx.core.content.res.ResourcesCompat
 import gh.otumfour.o24.R
+import gh.otumfour.o24.data.KeyHeight
+import gh.otumfour.o24.data.LetterSize
 import gh.otumfour.o24.suggest.SwipeKey
 import gh.otumfour.o24.suggest.SwipeSample
+import gh.otumfour.o24.theme.BackgroundStrength
 import gh.otumfour.o24.theme.GoldenStool
+import gh.otumfour.o24.theme.KeyCap
 import gh.otumfour.o24.theme.PhotoBackdrop
 import gh.otumfour.o24.theme.ThemeArt
 import gh.otumfour.o24.theme.ThemeColors
@@ -63,6 +72,24 @@ class KeyboardView @JvmOverloads constructor(
     var onSwipe: (List<SwipeSample>, List<SwipeKey>, Float) -> Unit = { _, _, _ -> }
     var hapticEnabled: Boolean = true
     var soundEnabled: Boolean = false
+    var previewEnabled: Boolean = true
+    var keyHeight: KeyHeight = KeyHeight.NORMAL
+        set(value) {
+            field = value
+            requestLayout()
+            invalidate()
+        }
+    var letterSize: LetterSize = LetterSize.NORMAL
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var backgroundStrength: BackgroundStrength = BackgroundStrength.SOFT
+        set(value) {
+            field = value
+            art = null
+            invalidate()
+        }
     var swipeEnabled: Boolean = true
         set(value) {
             field = value
@@ -77,8 +104,10 @@ class KeyboardView @JvmOverloads constructor(
     private var art: Bitmap? = null
     private var artCanvas: Canvas? = null
     private val handler = Handler(Looper.getMainLooper())
-    private var pressed: KeySpec? = null
+    private var pressed: Placed? = null
     private var longFired = false
+    private var previewWindow: PopupWindow? = null
+    private var previewText: TextView? = null
     private var downTime = 0L
     private var downX = 0f
     private var downY = 0f
@@ -99,7 +128,7 @@ class KeyboardView @JvmOverloads constructor(
 
     private val repeatRunnable = object : Runnable {
         override fun run() {
-            val key = pressed ?: return
+            val key = pressed?.key ?: return
             if (!key.repeat) return
             onKey(key)
             handler.postDelayed(this, 45L)
@@ -107,11 +136,13 @@ class KeyboardView @JvmOverloads constructor(
     }
 
     private val longRunnable = Runnable {
-        val key = pressed ?: return@Runnable
+        val item = pressed ?: return@Runnable
+        val key = item.key
         if (key.alternate != null) {
             longFired = true
             handler.removeCallbacks(repeatRunnable)
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            showPreview(item, key.alternate)
             onAlternate(key)
         }
     }
@@ -130,8 +161,9 @@ class KeyboardView @JvmOverloads constructor(
         for (item in placed) {
             val key = item.key
             val rect = item.rect
-            val down = key == pressed
-            val (bg, fg, border) = paintsFor(key, item.row, themeColors, down)
+            val down = item === pressed
+            val (rawBg, fg, border) = paintsFor(key, item.row, themeColors, down)
+            val bg = KeyCap.ensure(rawBg, fg)
             fill.color = bg
             canvas.drawRoundRect(rect, radius, radius, fill)
             if (themeColors.stoneKeys && key.role != KeySpec.Role.ACCENT) stone(canvas, rect, key.label)
@@ -174,14 +206,23 @@ class KeyboardView @JvmOverloads constructor(
                 )
             }
             label.color = fg
-            label.typeface = outfit
-            label.isFakeBoldText = themeColors.boldLetters || themeColors.modern
+            label.typeface = Typeface.create(outfit ?: Typeface.DEFAULT, Typeface.BOLD)
+            label.isFakeBoldText = true
+            val letter = sp(KeyMetrics.letterSp(letterSize, resources.configuration.screenWidthDp))
             val wanted = when {
-                key.role == KeySpec.Role.SPACE -> dp(13f)
-                key.label.length > 2 -> dp(13f)
-                else -> dp(18f)
+                key.role == KeySpec.Role.SPACE -> letter * 0.62f
+                key.label.length > 2 -> letter * 0.68f
+                else -> letter
             }
-            label.textSize = min(wanted, rect.height() * 0.46f)
+            label.textAlign = Paint.Align.CENTER
+            label.textSize = min(wanted, rect.height() * 0.72f)
+            key.alternate?.takeIf { hint -> hint.length == 1 && hint != key.label }?.let { hint ->
+                label.textAlign = Paint.Align.RIGHT
+                label.textSize = sp(11f)
+                canvas.drawText(hint, rect.right - dp(4f), rect.top + dp(2f) - label.ascent(), label)
+                label.textAlign = Paint.Align.CENTER
+                label.textSize = min(wanted, rect.height() * 0.72f)
+            }
             val baseline = rect.centerY() - (label.descent() + label.ascent()) / 2f
             if (themeColors.modern && key.role == KeySpec.Role.SPACE) {
                 val textWidth = label.measureText(key.label)
@@ -196,8 +237,9 @@ class KeyboardView @JvmOverloads constructor(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                val key = hit(event.x, event.y) ?: return true
-                pressed = key
+                val item = hitPlaced(event.x, event.y) ?: return true
+                val key = item.key
+                pressed = item
                 longFired = false
                 swiping = false
                 swipeHapticSent = false
@@ -212,6 +254,7 @@ class KeyboardView @JvmOverloads constructor(
                     clearTrail()
                 }
                 parent?.requestDisallowInterceptTouchEvent(true)
+                showPreview(item, key.label)
                 if (key.repeat) {
                     onKey(key)
                     longFired = true
@@ -225,9 +268,11 @@ class KeyboardView @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val travel = hypot(event.x - downX, event.y - downY)
                 if (swipeEnabled) trail.add(SwipeSample(event.x, event.y, event.eventTime))
-                val letter = pressed?.value?.length == 1 && pressed?.value?.get(0)?.isLetter() == true
-                if (!swiping && swipeEnabled && letter && travel > averageKeyWidth() * 1.5f) {
+                val key = pressed?.key
+                val letter = key?.value?.length == 1 && key.value[0].isLetter()
+                if (!swiping && swipeEnabled && letter && travel > swipeTravel()) {
                     swiping = true
+                    hidePreview()
                     handler.removeCallbacks(longRunnable)
                     handler.removeCallbacks(repeatRunnable)
                     if (!swipeHapticSent) {
@@ -235,24 +280,13 @@ class KeyboardView @JvmOverloads constructor(
                         tick()
                     }
                 }
-                if (!swiping) {
-                    if (!swipeEnabled) {
-                        if (hit(event.x, event.y) != pressed) pressed = null
-                    } else {
-                        val key = hit(event.x, event.y)
-                        if (key != pressed) {
-                            handler.removeCallbacks(longRunnable)
-                            handler.removeCallbacks(repeatRunnable)
-                            pressed = key
-                        }
-                    }
-                }
                 invalidate()
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 handler.removeCallbacks(longRunnable)
                 handler.removeCallbacks(repeatRunnable)
-                val key = pressed
+                hidePreview()
+                val key = pressed?.key
                 val moved = hypot(event.x - downX, event.y - downY)
                 if (event.actionMasked == MotionEvent.ACTION_UP && swipeEnabled && swiping && trail.size > 1) {
                     trail.add(SwipeSample(event.x, event.y, event.eventTime))
@@ -262,11 +296,10 @@ class KeyboardView @JvmOverloads constructor(
                     handler.postDelayed({ invalidate() }, 16L)
                 } else if (
                     event.actionMasked == MotionEvent.ACTION_UP &&
-                    swipeEnabled.not() &&
-                    moved > dp(18f)
+                    key != null &&
+                    !longFired &&
+                    (swipeEnabled || moved <= swipeTravel())
                 ) {
-                    clearTrail()
-                } else if (event.actionMasked == MotionEvent.ACTION_UP && key != null && !longFired && hit(event.x, event.y) == key) {
                     tick()
                     if (soundEnabled) {
                         context.getSystemService(AudioManager::class.java)
@@ -354,9 +387,8 @@ class KeyboardView @JvmOverloads constructor(
         val gap = dp(5f)
         val pad = dp(4f)
         val topExtra = if (theme == ThemeId.ROYAL_CREST) dp(14f) else 0f
-        val bottomInset = gestureInset()
-        val usableH = height - pad * 2 - topExtra - bottomInset - gap * (rows.size - 1)
-        val rowH = (usableH / rows.size).coerceAtMost(dp(58f))
+        val usableH = height - pad * 2 - topExtra - gap * (rows.size - 1)
+        val rowH = (usableH / rows.size).coerceAtMost(preferredRowHeight())
         val cap = keyCap()
         var y = pad + topExtra
         rows.forEachIndexed { index, row ->
@@ -373,10 +405,9 @@ class KeyboardView @JvmOverloads constructor(
         val gap = dp(6f)
         val pad = dp(4f)
         val gutter = dp(36f)
-        val bottomInset = gestureInset()
         val count = extra.size + maxOf(left.size, right.size).coerceAtLeast(1)
-        val usableH = height - pad * 2 - bottomInset - gap * (count - 1)
-        val rowH = (usableH / count).coerceAtMost(dp(58f))
+        val usableH = height - pad * 2 - gap * (count - 1)
+        val rowH = (usableH / count).coerceAtMost(preferredRowHeight())
         val cap = keyCap()
         val mid = width / 2f
         var y = pad
@@ -421,10 +452,13 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    private fun gestureInset(): Float {
-        val reported = rootWindowInsets?.systemWindowInsetBottom ?: 0
-        return ImeWindowLayout.bottomPaddingPx(reported).toFloat()
+    private fun preferredRowHeight(): Float {
+        val widthDp = resources.configuration.screenWidthDp
+        val narrow = widthDp < 360
+        return dp(KeyMetrics.rowHeightDp(keyHeight, widthDp, narrow))
     }
+
+    private fun swipeTravel(): Float = SwipeGesture.engagePx(averageKeyWidth(), resources.displayMetrics.density)
 
     private fun clearTrail() {
         trail.clear()
@@ -437,11 +471,13 @@ class KeyboardView @JvmOverloads constructor(
         requestLayout()
     }
 
-    private fun hit(x: Float, y: Float): KeySpec? {
-        for (item in placed) {
-            if (item.rect.contains(x, y)) return item.key
+    private fun hitPlaced(x: Float, y: Float): Placed? {
+        if (placed.isEmpty()) return null
+        val boxes = placed.mapIndexed { index, item ->
+            KeyHits.Box(index, item.rect.left, item.rect.top, item.rect.right, item.rect.bottom)
         }
-        return null
+        val index = KeyHits.nearest(x, y, boxes) ?: return null
+        return placed.getOrNull(index)
     }
 
     private fun ensureArt() {
@@ -449,9 +485,21 @@ class KeyboardView @JvmOverloads constructor(
         try {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            val photo = colors?.photoAsset
-            if (photo != null) PhotoBackdrop.draw(context, canvas, photo, width, height)
-            else ThemeArt.draw(canvas, theme, width, height)
+            val themeColors = colors
+            val photo = themeColors?.photoAsset
+            if (photo != null) {
+                PhotoBackdrop.draw(
+                    context,
+                    canvas,
+                    photo,
+                    width,
+                    height,
+                    backgroundStrength,
+                    themeColors.keyboardBg,
+                )
+            } else {
+                ThemeArt.draw(canvas, theme, width, height)
+            }
             art = bitmap
             artCanvas = canvas
         } catch (error: Throwable) {
@@ -521,25 +569,66 @@ class KeyboardView @JvmOverloads constructor(
         canvas.drawCircle(last.x, last.y, dp(7f), fill)
     }
 
+    private fun showPreview(item: Placed, text: String) {
+        if (!previewEnabled || text.isEmpty() || text.length > 3) return
+        if (item.key.role == KeySpec.Role.SPACE || item.key.action == KeyAction.ENTER) return
+        val shown = previewText ?: TextView(context).also { view ->
+            view.gravity = Gravity.CENTER
+            view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            view.typeface = Typeface.create(outfit ?: Typeface.DEFAULT_BOLD, Typeface.BOLD)
+            view.setPadding(dp(10f).toInt(), dp(6f).toInt(), dp(10f).toInt(), dp(8f).toInt())
+            previewText = view
+        }
+        val themeColors = colors
+        val fillColor = KeyCap.ensure(themeColors?.keyFill ?: Color.BLACK, themeColors?.keyLabel ?: Color.WHITE)
+        shown.text = text
+        shown.setTextColor(themeColors?.keyLabel ?: Color.WHITE)
+        shown.background = GradientDrawable().apply {
+            cornerRadius = dp(12f)
+            setColor(fillColor)
+        }
+        val window = previewWindow ?: PopupWindow(shown, dp(64f).toInt(), dp(72f).toInt(), false).also { popup ->
+            popup.isTouchable = false
+            popup.isClippingEnabled = false
+            popup.elevation = dp(8f)
+            previewWindow = popup
+        }
+        window.contentView = shown
+        val location = IntArray(2)
+        getLocationInWindow(location)
+        val x = (location[0] + item.rect.centerX() - window.width / 2f).toInt()
+        val y = (location[1] + item.rect.top - window.height - dp(8f)).toInt()
+        runCatching {
+            if (window.isShowing) window.update(x, y, window.width, window.height)
+            else if (isAttachedToWindow) window.showAtLocation(this, Gravity.NO_GRAVITY, x, y)
+        }
+    }
+
+    private fun hidePreview() {
+        runCatching { previewWindow?.dismiss() }
+    }
+
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
+
+    private fun sp(value: Float): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, resources.displayMetrics)
 
     override fun onDetachedFromWindow() {
         handler.removeCallbacksAndMessages(null)
+        hidePreview()
         super.onDetachedFromWindow()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        val metrics = resources.displayMetrics
-        val shorter = min(metrics.widthPixels, metrics.heightPixels)
         val rowsCount = rows.size.coerceAtLeast(4)
-        val narrow = resources.configuration.screenWidthDp < 360
-        val rowMin = dp(if (narrow) 38f else 42f)
-        val rowH = (shorter * 0.078f).coerceIn(rowMin, dp(54f))
-        val wanted = (rowH * rowsCount + dp(10f) + gestureInset()).toInt()
+        // Navigation-bar padding lives on the input view, so the background can
+        // run behind the bar. Do not add that inset to the key block again.
+        val rowH = preferredRowHeight()
+        val wanted = (rowH * rowsCount + dp(10f)).toInt()
         val mode = MeasureSpec.getMode(heightMeasureSpec)
         val spec = MeasureSpec.getSize(heightMeasureSpec)
         val height = if (mode == MeasureSpec.EXACTLY && spec > 0) spec else wanted
-        setMeasuredDimension(width, height.coerceAtLeast((rowMin * 4).toInt()))
+        setMeasuredDimension(width, height.coerceAtLeast((dp(40f) * 4).toInt()))
     }
 }
