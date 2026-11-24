@@ -11,11 +11,15 @@ enum class KeyAction {
     MODE,
     EMOJI,
     LANGUAGE,
+    SYMBOL_PAGE,
+    NUMPAD,
 }
+
+enum class KeyIcon { ENTER, SEARCH, SEND, DONE, NEXT, GO }
 
 enum class ShiftState { OFF, ONCE, CAPS }
 
-enum class BoardPage { LETTERS, SYMBOLS, EMOJI }
+enum class BoardPage { LETTERS, SYMBOLS, SYMBOLS_MORE, NUMPAD, EMOJI }
 
 data class KeySpec(
     val label: String,
@@ -25,8 +29,14 @@ data class KeySpec(
     val repeat: Boolean = false,
     val alternate: String? = null,
     val role: Role = Role.LETTER,
+    val hint: String? = null,
+    val extras: List<String> = emptyList(),
+    val round: Boolean = false,
+    val icon: KeyIcon? = null,
 ) {
     enum class Role { LETTER, ACTION, ACCENT, SPACE }
+
+    fun choices(): List<String> = extras.ifEmpty { listOfNotNull(alternate) }
 }
 
 object KeyboardModel {
@@ -36,10 +46,8 @@ object KeyboardModel {
         listOf("z", "x", "c", "v", "b", "n", "m"),
     )
 
-    private val symbolRows = listOf(
-        listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
-        listOf("@", "#", "$", "%", "&", "-", "_", "+", "(", ")"),
-    )
+    private val digits = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
+    private val symbolSecond = listOf("@", "#", "$", "_", "&", "-", "+", "(", ")", "/")
 
     val emoji: List<String> = listOf(
         "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎",
@@ -59,7 +67,18 @@ object KeyboardModel {
     ): List<List<KeySpec>> = when (page) {
         BoardPage.LETTERS -> letters(language, shift, enterLabel, spaceLabel)
         BoardPage.SYMBOLS -> symbols(enterLabel, spaceLabel)
+        BoardPage.SYMBOLS_MORE -> symbolsMore(enterLabel, spaceLabel)
+        BoardPage.NUMPAD -> numpad(enterLabel, spaceLabel)
         BoardPage.EMOJI -> emojiRows(enterLabel, spaceLabel)
+    }
+
+    fun actionIcon(label: String): KeyIcon = when (label) {
+        "Search" -> KeyIcon.SEARCH
+        "Send" -> KeyIcon.SEND
+        "Done" -> KeyIcon.DONE
+        "Next" -> KeyIcon.NEXT
+        "Go" -> KeyIcon.GO
+        else -> KeyIcon.ENTER
     }
 
     private fun letters(language: KeyboardLanguage, shift: ShiftState, enterLabel: String, spaceLabel: String): List<List<KeySpec>> {
@@ -72,13 +91,18 @@ object KeyboardModel {
             })
         }
         letterRows.forEachIndexed { index, row ->
-            val keys = row.map { ch ->
+            val keys = row.mapIndexed { column, ch ->
                 val shown = if (shifted) ch.uppercase() else ch
+                val digit = if (index == 0) digits[column] else null
+                val special = language.alternate(shown)
+                val extras = listOfNotNull(digit, special).distinct()
                 KeySpec(
                     label = shown,
                     action = KeyAction.CHAR,
                     value = shown,
-                    alternate = language.alternate(shown),
+                    hint = digit,
+                    alternate = extras.firstOrNull(),
+                    extras = extras,
                 )
             }
             if (index == 2) {
@@ -96,42 +120,88 @@ object KeyboardModel {
                 rows.add(keys)
             }
         }
-        rows.add(
-            listOf(
-                KeySpec("123", KeyAction.MODE, weight = 1.3f, role = KeySpec.Role.ACTION),
-                KeySpec("😊", KeyAction.EMOJI, weight = 1.1f, role = KeySpec.Role.ACTION),
-                KeySpec(",", KeyAction.CHAR, ",", weight = 1f),
-                KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 4.6f, role = KeySpec.Role.SPACE, alternate = "lang"),
-                KeySpec(".", KeyAction.CHAR, ".", weight = 1f, alternate = "_"),
-                KeySpec(enterLabel, KeyAction.ENTER, weight = 1.6f, role = KeySpec.Role.ACCENT),
-            ),
-        )
+        rows.add(bottomRow("?123", enterLabel, spaceLabel, includeEmoji = true))
         return rows
     }
 
+    private fun bottomRow(modeLabel: String, enterLabel: String, spaceLabel: String, includeEmoji: Boolean): List<KeySpec> {
+        val keys = ArrayList<KeySpec>()
+        keys.add(KeySpec(modeLabel, KeyAction.MODE, weight = 1.35f, role = KeySpec.Role.ACTION))
+        keys.add(KeySpec(",", KeyAction.CHAR, ",", weight = 1f))
+        if (includeEmoji) keys.add(KeySpec("😊", KeyAction.EMOJI, weight = 1.05f, role = KeySpec.Role.ACTION))
+        keys.add(KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 4.4f, role = KeySpec.Role.SPACE, alternate = "lang"))
+        keys.add(KeySpec(".", KeyAction.CHAR, ".", weight = 1f, alternate = "_"))
+        keys.add(actionKey(enterLabel))
+        return keys
+    }
+
+    private fun actionKey(enterLabel: String) = KeySpec(
+        label = enterLabel,
+        action = KeyAction.ENTER,
+        weight = 1.25f,
+        role = KeySpec.Role.ACCENT,
+        round = true,
+        icon = actionIcon(enterLabel),
+    )
+
     private fun symbols(enterLabel: String, spaceLabel: String): List<List<KeySpec>> {
-        val punctuation = listOf("'", "\"", ":", ";", "!", "?", "/", "₵", "…")
+        val punctuation = listOf("*", "\"", "'", ":", ";", "!", "?")
         return listOf(
-            symbolRows[0].map { KeySpec(it, KeyAction.CHAR, it) },
-            symbolRows[1].map { symbol ->
-                KeySpec(
-                    label = symbol,
-                    action = KeyAction.CHAR,
-                    value = symbol,
-                    alternate = if (symbol == "-") "_" else null,
-                )
+            digits.map { KeySpec(it, KeyAction.CHAR, it) },
+            symbolSecond.map { symbol ->
+                KeySpec(symbol, KeyAction.CHAR, symbol, alternate = if (symbol == "-") "_" else null)
             },
-            listOf(KeySpec(",", KeyAction.CHAR, ",", weight = 1.2f, role = KeySpec.Role.ACTION)) +
+            listOf(KeySpec("=\\<", KeyAction.SYMBOL_PAGE, weight = 1.3f, role = KeySpec.Role.ACTION)) +
                 punctuation.map { KeySpec(it, KeyAction.CHAR, it) } +
                 listOf(KeySpec("⌫", KeyAction.BACKSPACE, weight = 1.35f, repeat = true, role = KeySpec.Role.ACTION)),
             listOf(
-                KeySpec("ABC", KeyAction.MODE, weight = 1.4f, role = KeySpec.Role.ACTION),
-                KeySpec("😊", KeyAction.EMOJI, weight = 1.1f, role = KeySpec.Role.ACTION),
-                KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 4.4f, role = KeySpec.Role.SPACE),
-                KeySpec(enterLabel, KeyAction.ENTER, weight = 1.7f, role = KeySpec.Role.ACCENT),
+                KeySpec("ABC", KeyAction.MODE, weight = 1.3f, role = KeySpec.Role.ACTION),
+                KeySpec(",", KeyAction.CHAR, ",", weight = 1f),
+                KeySpec("1234", KeyAction.NUMPAD, weight = 1.3f, role = KeySpec.Role.ACTION),
+                KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 4f, role = KeySpec.Role.SPACE),
+                KeySpec(".", KeyAction.CHAR, ".", weight = 1f, alternate = "_"),
+                actionKey(enterLabel),
             ),
         )
     }
+
+    private fun symbolsMore(enterLabel: String, spaceLabel: String): List<List<KeySpec>> {
+        val first = listOf("~", "`", "|", "•", "√", "π", "÷", "×", "§", "Δ")
+        val second = listOf("£", "¢", "€", "¥", "^", "°", "=", "{", "}", "\\")
+        val third = listOf("%", "©", "®", "™", "✓", "[", "]")
+        return listOf(
+            first.map { KeySpec(it, KeyAction.CHAR, it) },
+            second.map { KeySpec(it, KeyAction.CHAR, it) },
+            listOf(KeySpec("?123", KeyAction.SYMBOL_PAGE, weight = 1.35f, role = KeySpec.Role.ACTION)) +
+                third.map { KeySpec(it, KeyAction.CHAR, it) } +
+                listOf(KeySpec("⌫", KeyAction.BACKSPACE, weight = 1.35f, repeat = true, role = KeySpec.Role.ACTION)),
+            listOf(
+                KeySpec("ABC", KeyAction.MODE, weight = 1.25f, role = KeySpec.Role.ACTION),
+                KeySpec("<", KeyAction.CHAR, "<", weight = 1f),
+                KeySpec("1234", KeyAction.NUMPAD, weight = 1.3f, role = KeySpec.Role.ACTION),
+                KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 3.6f, role = KeySpec.Role.SPACE),
+                KeySpec(">", KeyAction.CHAR, ">", weight = 1f),
+                actionKey(enterLabel),
+            ),
+        )
+    }
+
+    private fun numpad(enterLabel: String, spaceLabel: String): List<List<KeySpec>> = listOf(
+        listOf("1", "2", "3", "-").map { KeySpec(it, KeyAction.CHAR, it) },
+        listOf("4", "5", "6", "+").map { KeySpec(it, KeyAction.CHAR, it) },
+        listOf("7", "8", "9", "*").map { KeySpec(it, KeyAction.CHAR, it) },
+        listOf(
+            KeySpec("?123", KeyAction.SYMBOL_PAGE, weight = 1.3f, role = KeySpec.Role.ACTION),
+            KeySpec("0", KeyAction.CHAR, "0"),
+            KeySpec(".", KeyAction.CHAR, ".", alternate = "_"),
+            KeySpec("⌫", KeyAction.BACKSPACE, weight = 1.3f, repeat = true, role = KeySpec.Role.ACTION),
+        ),
+        listOf(
+            KeySpec("ABC", KeyAction.MODE, weight = 1.3f, role = KeySpec.Role.ACTION),
+            KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 3f, role = KeySpec.Role.SPACE),
+            actionKey(enterLabel),
+        ),
+    )
 
     private fun emojiRows(enterLabel: String, spaceLabel: String): List<List<KeySpec>> {
         val rows = emoji.chunked(8).map { line ->
