@@ -32,6 +32,7 @@
             android:name=".ui.OnboardingActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|uiMode|density"
             android:exported="false"
+            android:launchMode="singleTask"
             android:resizeableActivity="true"
             android:theme="@style/Theme.O24.Starting" />
 

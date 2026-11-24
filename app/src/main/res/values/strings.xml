@@ -93,6 +93,8 @@
     <string name="ime_default_action">Set as default</string>
     <string name="ime_ready_title">Otumfour is active</string>
     <string name="ime_ready_body">It is enabled and set as the default keyboard. You can change this any time.</string>
+    <string name="run_setup_again">Run setup again</string>
+    <string name="run_setup_again_help">Shows the welcome steps again.</string>
     <string name="ai_example_formal_title">Make it formal</string>
     <string name="ai_example_formal_body">“can you send it today” can become a fuller, more formal line.</string>
     <string name="ai_example_short_title">Make it shorter</string>

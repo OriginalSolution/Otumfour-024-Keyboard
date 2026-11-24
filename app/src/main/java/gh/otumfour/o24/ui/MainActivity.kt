@@ -66,7 +66,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prepareEdgeToEdge()
         store = SettingsStore(this)
-        if (shouldLeaveForOnboarding(intent)) {
+        if (SetupDone.shouldClose(store.closeWhenActive(), imeReadiness())) {
+            store.setCloseWhenActive(false)
+            finishAndRemoveTask()
+            return
+        }
+        if (SetupDone.launchDestination(store.isOnboarded(), runAgain = false) == LaunchDestination.ONBOARDING &&
+            shouldLeaveForOnboarding(intent)
+        ) {
             startActivity(
                 Intent(this, OnboardingActivity::class.java)
                     .putExtra(OnboardingActivity.EXTRA_PAGE, store.onboardingPage()),
@@ -86,7 +93,22 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (!::store.isInitialized || shouldLeaveForOnboarding(intent)) return
+        if (!::store.isInitialized) return
+        if (SetupDone.shouldClose(store.closeWhenActive(), imeReadiness())) {
+            store.setCloseWhenActive(false)
+            finishAndRemoveTask()
+            return
+        }
+        if (store.isOnboarded()) {
+            val page = if (intent.hasExtra(EXTRA_PAGE)) intent.getIntExtra(EXTRA_PAGE, 0) else SettingsPages.HOME
+            installUi(page.coerceIn(0, PAGE_COUNT - 1))
+            return
+        }
+        if (shouldLeaveForOnboarding(intent)) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
+            return
+        }
         installUi(intent.getIntExtra(EXTRA_PAGE, 0).coerceIn(0, PAGE_COUNT - 1))
     }
 
@@ -264,40 +286,55 @@ class MainActivity : AppCompatActivity() {
         val pages = pager ?: return
         when (SetupDone.onPrimary(pages.currentItem, PAGE_COUNT, imeReadiness())) {
             DoneStep.ADVANCE -> pages.currentItem = pages.currentItem + 1
-            DoneStep.OPEN_INPUT_SETTINGS -> {
-                waitingForEnable = true
-                openInputSettings()
-            }
-            DoneStep.SHOW_IME_PICKER -> {
-                waitingForDefault = true
-                showImePicker()
-            }
-            DoneStep.LAND_HOME -> landOnHome()
+            DoneStep.OPEN_INPUT_SETTINGS -> leaveForIme(showPicker = false)
+            DoneStep.SHOW_IME_PICKER -> leaveForIme(showPicker = true)
+            DoneStep.CLOSE -> closeAfterDone()
         }
     }
 
-    private fun landOnHome() {
+    /** Writes onboarding_complete before this activity can be recreated. */
+    private fun leaveForIme(showPicker: Boolean) {
+        store.setOnboarded()
+        store.setCloseWhenActive(true)
+        waitingForEnable = !showPicker
+        waitingForDefault = showPicker
+        if (showPicker) showImePicker() else openInputSettings()
+    }
+
+    private fun closeAfterDone() {
         waitingForEnable = false
         waitingForDefault = false
         store.setOnboarded()
-        pager?.setCurrentItem(SettingsPages.HOME, false)
-        bindImeStatus()
+        store.setCloseWhenActive(false)
+        finishAndRemoveTask()
     }
 
     private fun continueImeSetup() {
+        if (!store.closeWhenActive()) {
+            bindImeStatus()
+            return
+        }
         val state = imeReadiness()
-        if (waitingForEnable && state != ImeReadiness.NOT_ENABLED) {
+        if (SetupDone.shouldClose(true, state)) {
+            closeAfterDone()
+            return
+        }
+        if (state == ImeReadiness.NOT_DEFAULT && !waitingForDefault) {
             waitingForEnable = false
-            if (state == ImeReadiness.NOT_DEFAULT) {
-                waitingForDefault = true
-                showImePicker()
-            } else {
-                landOnHome()
-            }
-        } else if (waitingForDefault && state == ImeReadiness.READY) {
-            landOnHome()
+            waitingForDefault = true
+            showImePicker()
         }
         bindImeStatus()
+    }
+
+    private fun runSetupAgain() {
+        store.clearOnboarded()
+        startActivity(
+            Intent(this, OnboardingActivity::class.java)
+                .putExtra(OnboardingActivity.EXTRA_PAGE, 0)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        )
+        finish()
     }
 
     private fun imeReadiness(): ImeReadiness {
@@ -379,6 +416,16 @@ class MainActivity : AppCompatActivity() {
             if (pair.size == 1) row.addView(View(this@MainActivity), LinearLayout.LayoutParams(0, 0, 1f))
             addView(row)
         }
+        addView(outlinePill(this@MainActivity, getString(R.string.run_setup_again)) { runSetupAgain() }.apply {
+            contentDescription = getString(R.string.run_setup_again)
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(16)
+            marginStart = dp(6)
+            marginEnd = dp(6)
+        })
+        addView(mutedText(this@MainActivity, getString(R.string.run_setup_again_help)).apply {
+            setPadding(dp(8), dp(6), dp(8), dp(12))
+        })
     }
 
     private fun homeCard(title: String, blurb: String, onClick: () -> Unit): View {

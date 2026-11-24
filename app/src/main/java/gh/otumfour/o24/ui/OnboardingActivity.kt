@@ -52,8 +52,8 @@ class OnboardingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prepareEdgeToEdge()
         val store = SettingsStore(this)
-        if (store.isOnboarded()) {
-            openSettings()
+        if (store.isOnboarded() && !store.closeWhenActive()) {
+            finish()
             return
         }
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -102,6 +102,14 @@ class OnboardingActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        val store = SettingsStore(this)
+        val state = SetupDone.readiness(keyboardEnabled(), keyboardSelected())
+        if (SetupDone.shouldClose(store.closeWhenActive(), state)) {
+            store.setCloseWhenActive(false)
+            finishAndRemoveTask()
+            return
+        }
+        if (store.closeWhenActive() && state == ImeReadiness.NOT_DEFAULT && !pickerRequested) openPicker()
         refreshIme()
     }
 
@@ -194,7 +202,7 @@ class OnboardingActivity : AppCompatActivity() {
         backButton.isEnabled = true
         primary.text = when (position) {
             0 -> getString(R.string.welcome_continue)
-            PAGE_COUNT - 1 -> getString(R.string.slide_finish)
+            PAGE_COUNT - 1 -> getString(R.string.slide_done)
             else -> getString(R.string.slide_next)
         }
         enableStatus?.text = if (keyboardEnabled()) {
@@ -228,18 +236,23 @@ class OnboardingActivity : AppCompatActivity() {
     }
 
     private fun finishOnboarding() {
-        if (!SettingsStoreHolder.markDone(this)) SettingsStore(this).setOnboarded()
-        SettingsStore(this).setOnboardingPage(0)
-        openSettings()
-    }
-
-    private fun openSettings() {
-        startActivity(
-            Intent(this, MainActivity::class.java)
-                .putExtra(MainActivity.EXTRA_AFTER_ONBOARDING, true)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
-        )
-        finish()
+        val store = SettingsStore(this)
+        if (!SettingsStoreHolder.markDone(this)) store.setOnboarded()
+        store.setOnboardingPage(0)
+        when (SetupDone.readiness(keyboardEnabled(), keyboardSelected())) {
+            ImeReadiness.NOT_ENABLED -> {
+                store.setCloseWhenActive(true)
+                startInputSettings()
+            }
+            ImeReadiness.NOT_DEFAULT -> {
+                store.setCloseWhenActive(true)
+                openPicker()
+            }
+            ImeReadiness.READY -> {
+                store.setCloseWhenActive(false)
+                finishAndRemoveTask()
+            }
+        }
     }
 
     private fun maybeAdvance() {
