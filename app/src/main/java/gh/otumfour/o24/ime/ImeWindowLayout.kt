@@ -1,14 +1,20 @@
 package gh.otumfour.o24.ime
 
+import kotlin.math.max
+
 /**
- * Do not add the navigation-bar inset to the keyboard height.
+ * Bottom padding that lifts the keys clear of the system navigation bar.
  *
- * API 36 forces edge-to-edge and ignores [androidx.core.view.WindowCompat.setDecorFitsSystemWindows].
- * The inset still flickers on gesture navigation, including Samsung and Huawei, and on a fold.
- * The input-method window is positioned by the system. Growing the keyboard by that inset
- * moves the keys by about one gesture bar. [bottomPaddingPx] stays zero so the height is stable
- * on phones, tablets, and the inner Fold screen.
+ * API 36 draws the input method edge-to-edge, so the nav-bar icons sit on top of
+ * the bottom row unless the input view is padded. The padding is the larger of
+ * [navigationBars] and [mandatorySystemGestures]. It is applied to the input view
+ * only: the keyboard background keeps painting through that strip, and the key
+ * rows are not grown by the inset a second time.
  */
 object ImeWindowLayout {
-    fun bottomPaddingPx(reportedNavigationInsetPx: Int): Int = 0
+    fun bottomPaddingPx(navigationBarsBottomPx: Int, mandatorySystemGesturesBottomPx: Int = 0): Int {
+        val bars = navigationBarsBottomPx.coerceAtLeast(0)
+        val gestures = mandatorySystemGesturesBottomPx.coerceAtLeast(0)
+        return max(bars, gestures)
+    }
 }

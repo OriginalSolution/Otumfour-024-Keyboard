@@ -8,12 +8,14 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
@@ -31,9 +33,13 @@ import androidx.viewpager2.widget.ViewPager2
 import gh.otumfour.o24.BuildConfig
 import gh.otumfour.o24.CrashReport
 import gh.otumfour.o24.R
+import gh.otumfour.o24.data.KeyHeight
 import gh.otumfour.o24.data.LearnedWords
+import gh.otumfour.o24.data.LetterSize
 import gh.otumfour.o24.data.SettingsStore
+import gh.otumfour.o24.ime.O24InputMethodService
 import gh.otumfour.o24.lang.KeyboardLanguage
+import gh.otumfour.o24.theme.BackgroundStrength
 import gh.otumfour.o24.theme.ThemeId
 
 /** Home and settings slides. Wide screens use a two-pane layout. */
@@ -50,6 +56,10 @@ class MainActivity : AppCompatActivity() {
     private var detail: FrameLayout? = null
     private var freezeAdvance = false
     private var versionTaps = 0
+    private var waitingForEnable = false
+    private var waitingForDefault = false
+    private var imeStatusSlot: LinearLayout? = null
+    private val serviceClass = O24InputMethodService::class.java.name
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -86,6 +96,17 @@ class MainActivity : AppCompatActivity() {
         return !OnboardingRouter.showSettingsFromKeyboard(store.isOnboarded(), fromKeyboard) && !afterSlides
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (!::store.isInitialized) return
+        continueImeSetup()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::store.isInitialized) continueImeSetup()
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(STATE_PAGE, currentSection())
@@ -101,6 +122,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun installUi(page: Int) {
         section = page
+        imeStatusSlot = null
         val shell = if (widthClass() == WidthClass.EXPANDED) twoPane(page) else slideShell(page)
         setContentView(shell)
         shell.applySystemBarInsets()
@@ -240,8 +262,74 @@ class MainActivity : AppCompatActivity() {
 
     private fun advance() {
         val pages = pager ?: return
-        if (pages.currentItem < PAGE_COUNT - 1) pages.currentItem = pages.currentItem + 1
-        else pages.setCurrentItem(0, true)
+        when (SetupDone.onPrimary(pages.currentItem, PAGE_COUNT, imeReadiness())) {
+            DoneStep.ADVANCE -> pages.currentItem = pages.currentItem + 1
+            DoneStep.OPEN_INPUT_SETTINGS -> {
+                waitingForEnable = true
+                openInputSettings()
+            }
+            DoneStep.SHOW_IME_PICKER -> {
+                waitingForDefault = true
+                showImePicker()
+            }
+            DoneStep.LAND_HOME -> landOnHome()
+        }
+    }
+
+    private fun landOnHome() {
+        waitingForEnable = false
+        waitingForDefault = false
+        store.setOnboarded()
+        pager?.setCurrentItem(SettingsPages.HOME, false)
+        bindImeStatus()
+    }
+
+    private fun continueImeSetup() {
+        val state = imeReadiness()
+        if (waitingForEnable && state != ImeReadiness.NOT_ENABLED) {
+            waitingForEnable = false
+            if (state == ImeReadiness.NOT_DEFAULT) {
+                waitingForDefault = true
+                showImePicker()
+            } else {
+                landOnHome()
+            }
+        } else if (waitingForDefault && state == ImeReadiness.READY) {
+            landOnHome()
+        }
+        bindImeStatus()
+    }
+
+    private fun imeReadiness(): ImeReadiness {
+        val enabledList = runCatching {
+            Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_INPUT_METHODS)
+        }.getOrNull()
+        val current = runCatching {
+            Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        }.getOrNull()
+        return SetupDone.readiness(
+            ImeMatch.listContains(enabledList, packageName, serviceClass),
+            ImeMatch.isOurs(current, packageName, serviceClass),
+        )
+    }
+
+    private fun openInputSettings() {
+        val flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        val opened = runCatching {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS).addFlags(flags))
+        }.isSuccess
+        if (!opened) {
+            runCatching { startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(flags)) }
+        }
+    }
+
+    private fun showImePicker() {
+        val imm = getSystemService(InputMethodManager::class.java) ?: return
+        if (!hasWindowFocus()) {
+            window.decorView.post { if (hasWindowFocus()) runCatching { imm.showInputMethodPicker() } }
+            return
+        }
+        runCatching { imm.showInputMethodPicker() }
     }
 
     private fun openSection(index: Int) {
@@ -268,6 +356,9 @@ class MainActivity : AppCompatActivity() {
     private fun homePage(): View = scrollPage {
         addView(BrandHeaderView(this@MainActivity), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(132)))
         addView(mutedText(this@MainActivity, getString(R.string.home_intro)).apply { gravity = Gravity.CENTER })
+        imeStatusSlot = LinearLayout(this@MainActivity).apply { orientation = LinearLayout.VERTICAL }
+        addView(imeStatusSlot)
+        bindImeStatus()
         val cards = listOf(
             Triple(R.string.settings_theme, R.string.home_theme_blurb, 1),
             Triple(R.string.settings_languages, R.string.home_languages_blurb, 2),
@@ -399,8 +490,100 @@ class MainActivity : AppCompatActivity() {
         return card
     }
 
+    private fun bindImeStatus() {
+        val slot = imeStatusSlot ?: return
+        if (!::store.isInitialized) return
+        slot.removeAllViews()
+        val card = when (imeReadiness()) {
+            ImeReadiness.NOT_ENABLED -> statusCard(
+                getString(R.string.ime_enable_title),
+                getString(R.string.ime_enable_body),
+                getString(R.string.ime_enable_action),
+            ) {
+                waitingForEnable = true
+                openInputSettings()
+            }
+            ImeReadiness.NOT_DEFAULT -> statusCard(
+                getString(R.string.ime_default_title),
+                getString(R.string.ime_default_body),
+                getString(R.string.ime_default_action),
+            ) {
+                waitingForDefault = true
+                showImePicker()
+            }
+            ImeReadiness.READY -> statusCard(
+                getString(R.string.ime_ready_title),
+                getString(R.string.ime_ready_body),
+                null,
+                null,
+            )
+        }
+        marginBelow(card, 8)
+        slot.addView(card)
+    }
+
+    private fun statusCard(title: String, body: String, action: String?, onClick: (() -> Unit)?): View {
+        val card = o24Card(this) {
+            addView(TextView(this@MainActivity).apply {
+                text = title
+                setTextColor(o24Color(O24Color.GOLD))
+                textSize = 18f
+                typeface = Typeface.create("serif", Typeface.BOLD)
+            })
+            addView(bodyText(this@MainActivity, body).apply { setPadding(0, dp(6), 0, 0) })
+            if (action != null && onClick != null) {
+                addView(goldPill(this@MainActivity, action, onClick), LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(12) })
+            }
+        }
+        return card
+    }
+
     private fun typingPage(): View = scrollPage {
         addView(sectionLabel(this@MainActivity, getString(R.string.settings_typing)))
+        val settings = store.get()
+        addView(choiceCard(
+            getString(R.string.typing_key_height),
+            getString(R.string.typing_key_height_help),
+            listOf(
+                KeyHeight.SMALL.storage to getString(R.string.key_height_small),
+                KeyHeight.NORMAL.storage to getString(R.string.key_height_normal),
+                KeyHeight.LARGE.storage to getString(R.string.key_height_large),
+                KeyHeight.EXTRA_LARGE.storage to getString(R.string.key_height_extra),
+            ),
+            settings.keyHeight.storage,
+        ) { value ->
+            store.update { it.copy(keyHeight = KeyHeight.fromStorage(value)) }
+        })
+        addView(choiceCard(
+            getString(R.string.typing_letter_size),
+            getString(R.string.typing_letter_size_help),
+            listOf(
+                LetterSize.NORMAL.storage to getString(R.string.letter_size_normal),
+                LetterSize.LARGE.storage to getString(R.string.letter_size_large),
+                LetterSize.EXTRA_LARGE.storage to getString(R.string.letter_size_extra),
+            ),
+            settings.letterSize.storage,
+        ) { value ->
+            store.update { it.copy(letterSize = LetterSize.fromStorage(value)) }
+        })
+        addView(choiceCard(
+            getString(R.string.typing_background),
+            getString(R.string.typing_background_help),
+            listOf(
+                BackgroundStrength.OFF.storage to getString(R.string.background_off),
+                BackgroundStrength.SOFT.storage to getString(R.string.background_soft),
+                BackgroundStrength.FULL.storage to getString(R.string.background_full),
+            ),
+            settings.backgroundStrength.storage,
+        ) { value ->
+            store.update { it.copy(backgroundStrength = BackgroundStrength.fromStorage(value)) }
+        })
+        addView(toggleCard(getString(R.string.typing_preview), getString(R.string.typing_preview_help), settings.keyPreview) { checked ->
+            store.update { it.copy(keyPreview = checked) }
+        })
         addView(toggleCard(getString(R.string.typing_autocorrect), getString(R.string.typing_autocorrect_help), store.get().autocorrect) { checked ->
             store.update { it.copy(autocorrect = checked) }
         })
@@ -417,6 +600,61 @@ class MainActivity : AppCompatActivity() {
             store.update { it.copy(keySound = checked) }
         })
         addView(homeCard(getString(R.string.settings_learned), getString(R.string.home_learned_blurb)) { openSection(5) })
+    }
+
+    private fun choiceCard(
+        title: String,
+        help: String,
+        options: List<Pair<String, String>>,
+        selected: String,
+        onPick: (String) -> Unit,
+    ): View {
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun paint(chip: TextView, on: Boolean) {
+            chip.setTextColor(if (on) o24Color(O24Color.INK) else o24Color(O24Color.GOLD))
+            chip.background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                if (on) setColor(o24Color(O24Color.GOLD)) else {
+                    setColor(Color.TRANSPARENT)
+                    setStroke(dp(1), o24Color(O24Color.GOLD))
+                }
+            }
+        }
+        options.forEach { (value, label) ->
+            val chip = TextView(this).apply {
+                text = label
+                textSize = 14f
+                tag = value
+                setPadding(dp(12), dp(8), dp(12), dp(8))
+                paint(this, value == selected)
+                setOnClickListener {
+                    onPick(value)
+                    for (index in 0 until row.childCount) {
+                        val child = row.getChildAt(index) as? TextView ?: continue
+                        paint(child, child.tag == value)
+                    }
+                }
+            }
+            row.addView(chip, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { marginEnd = dp(8) })
+        }
+        val card = o24Card(this) {
+            addView(TextView(this@MainActivity).apply {
+                this.text = title
+                setTextColor(o24Color(O24Color.CREAM))
+                textSize = 16f
+            })
+            addView(mutedText(this@MainActivity, help))
+            addView(HorizontalScrollView(this@MainActivity).apply {
+                isHorizontalScrollBarEnabled = false
+                addView(row)
+                setPadding(0, dp(8), 0, 0)
+            })
+        }
+        marginBelow(card, 8)
+        return card
     }
 
     private fun toggleCard(title: String, help: String, checked: Boolean, onChange: (Boolean) -> Unit): View {

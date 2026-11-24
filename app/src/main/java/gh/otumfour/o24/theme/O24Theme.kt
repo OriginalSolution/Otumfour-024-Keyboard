@@ -110,7 +110,24 @@ private fun argb(alpha: Int, hex: String): Int {
     return Color.argb(alpha, Color.red(rgb), Color.green(rgb), Color.blue(rgb))
 }
 
-fun colorsFor(id: ThemeId): ThemeColors = when (id) {
+fun colorsFor(id: ThemeId): ThemeColors = readableKeys(themeColors(id))
+
+private fun readableKeys(colors: ThemeColors): ThemeColors {
+    fun cap(color: Int): Int = if (color == 0) 0 else KeyCap.solid(color)
+    return colors.copy(
+        keyFill = cap(colors.keyFill),
+        actionFill = cap(colors.actionFill),
+        accentFill = cap(colors.accentFill),
+        spaceFill = cap(colors.spaceFill),
+        pressed = cap(colors.pressed),
+        crestTopFill = cap(colors.crestTopFill),
+        shiftFill = cap(colors.shiftFill),
+        enterFill = cap(colors.enterFill),
+        boldLetters = true,
+    )
+}
+
+private fun themeColors(id: ThemeId): ThemeColors = when (id) {
     ThemeId.NIGHT -> modernTheme(id, light = false, photo = null)
     ThemeId.DAY -> modernTheme(id, light = true, photo = null)
     ThemeId.OTUMFUO -> modernTheme(id, light = false, photo = "themes/otumfuo.webp")

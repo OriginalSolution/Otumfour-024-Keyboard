@@ -55,6 +55,10 @@ class AutocorrectTest {
         assertTrue(Autocorrect.blocked("room24"))
         assertTrue(Autocorrect.blocked("@otumfuo"))
         assertTrue(Autocorrect.blocked("NASA"))
+        assertTrue(Autocorrect.blocked("joe_k"))
+        assertTrue(Autocorrect.blocked("joe_k@gmail.com"))
+        assertNull(Autocorrect.choose("joe_k", lexicon.suggest("joe_k"), known = false))
+        assertNull(Autocorrect.choose("joe_k@gmail.com", emptyList(), known = false))
         assertTrue(Autocorrect.blocked("ɛyɛ"))
         assertNull(Autocorrect.choose("ɛyɛ", lexicon.suggest("ɛyɛ"), known = false))
     }

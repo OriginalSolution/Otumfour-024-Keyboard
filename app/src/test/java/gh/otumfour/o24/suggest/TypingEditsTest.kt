@@ -10,6 +10,8 @@ class TypingEditsTest {
         assertTrue(TypingEdits.doubleSpace("hello "))
         assertFalse(TypingEdits.doubleSpace("hello. "))
         assertFalse(TypingEdits.doubleSpace("hello"))
+        assertFalse(TypingEdits.doubleSpace("joe_"))
+        assertFalse(TypingEdits.doubleSpace("_"))
     }
 
     @Test

@@ -39,10 +39,14 @@ import gh.otumfour.o24.suggest.SwipeDecoder
 import gh.otumfour.o24.suggest.SwipeKey
 import gh.otumfour.o24.suggest.SwipeSample
 import gh.otumfour.o24.suggest.TypingEdits
+import gh.otumfour.o24.suggest.WordSpan
+import gh.otumfour.o24.theme.BackgroundStrength
 import gh.otumfour.o24.theme.PhotoBackdrop
 import gh.otumfour.o24.theme.ThemeId
 import gh.otumfour.o24.theme.colorsFor
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import gh.otumfour.o24.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -100,9 +104,13 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             learned = LearnedWords(this)
             settings = store.get()
             window?.window?.let { imeWindow ->
-                // Keep the keyboard above the navigation bar instead of resizing when the inset flickers.
-                WindowCompat.setDecorFitsSystemWindows(imeWindow, true)
+                // API 36 ignores the old opt-out. Pad the input view ourselves.
+                WindowCompat.setDecorFitsSystemWindows(imeWindow, false)
                 imeWindow.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colorsFor(settings.theme).keyboardBg))
+                ViewCompat.setOnApplyWindowInsetsListener(imeWindow.decorView) { _, insets ->
+                    applyNavigationPadding(insets)
+                    insets
+                }
             }
             getSharedPreferences(SettingsStore.NAME, MODE_PRIVATE)
                 .registerOnSharedPreferenceChangeListener(this)
@@ -145,6 +153,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             clearTransientUi()
             keyboard?.swipeEnabled = settings.swipeTyping && !suppressSuggest
             reloadKeyboard()
+            applyNavigationPadding(null)
             refreshSuggestions()
         } catch (error: Throwable) {
             rememberFailure("onStartInputView", error)
@@ -165,6 +174,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         keyboard?.requestLayout()
+        applyNavigationPadding(null)
     }
 
     override fun onComputeInsets(outInsets: Insets) {
@@ -198,6 +208,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val colors = colorsFor(settings.theme)
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            clipToPadding = false
             setBackgroundColor(colors.keyboardBg)
         }
         root = column
@@ -288,6 +299,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             column.addView(board, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         }
         reloadKeyboard()
+        applyNavigationPadding(null)
         return column
     }
 
@@ -295,6 +307,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private fun fallbackKeyboard(): View {
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            clipToPadding = false
             setBackgroundColor(colorsFor(ThemeId.GOLDEN_STOOL).keyboardBg)
         }
         root = column
@@ -306,7 +319,34 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         }
         keyboard = board
         column.addView(board, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        applyNavigationPadding(null)
         return column
+    }
+
+    /**
+     * Lift the keys by the navigation-bar inset. The input view's background
+     * still fills the padded strip, so the cloth or photo runs behind the bar.
+     */
+    private fun applyNavigationPadding(insets: WindowInsetsCompat?) {
+        val view = root ?: return
+        val resolved = insets
+            ?: ViewCompat.getRootWindowInsets(view)
+            ?: window?.window?.decorView?.let { ViewCompat.getRootWindowInsets(it) }
+        val nav = resolved?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom
+        val gesture = resolved?.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures())?.bottom
+        val legacyInsets = view.rootWindowInsets ?: window?.window?.decorView?.rootWindowInsets
+        val legacy = if (nav == null && gesture == null && legacyInsets != null) {
+            WindowInsetsCompat.toWindowInsetsCompat(legacyInsets)
+                .getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        } else {
+            0
+        }
+        val bottom = if (nav != null || gesture != null) {
+            ImeWindowLayout.bottomPaddingPx(nav ?: 0, gesture ?: 0)
+        } else {
+            ImeWindowLayout.bottomPaddingPx(legacy, 0)
+        }
+        if (view.paddingBottom != bottom) view.setPadding(0, 0, 0, bottom)
     }
 
     private fun rememberFailure(where: String, error: Throwable) {
@@ -321,11 +361,19 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         board.colors = colors
         board.hapticEnabled = settings.haptic
         board.soundEnabled = settings.keySound
+        board.previewEnabled = settings.keyPreview
+        board.keyHeight = settings.keyHeight
+        board.letterSize = settings.letterSize
+        board.backgroundStrength = settings.backgroundStrength
         board.swipeEnabled = settings.swipeTyping && !suppressSuggest
         board.rows = KeyboardModel.rows(page, settings.language, shift, enterLabel, colors.spaceTitle)
         val photo = colors.photoAsset
-        if (photo != null) root?.background = PhotoBackdrop.drawable(this, photo)
-        else root?.setBackgroundColor(colors.keyboardBg)
+        if (photo != null && settings.backgroundStrength != BackgroundStrength.OFF) {
+            root?.background = PhotoBackdrop.drawable(this, photo, settings.backgroundStrength, colors.keyboardBg)
+        } else {
+            root?.setBackgroundColor(colors.keyboardBg)
+        }
+        window?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(colors.keyboardBg))
         hairline?.visibility = if (colors.modern) View.VISIBLE else View.GONE
         suggestionViews.forEachIndexed { index, view ->
             styleChip(view, index == 0 && view.text.isNotEmpty())
@@ -393,10 +441,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             "lang" -> cycleLanguage()
             null -> Unit
             else -> {
-                ic.commitText(key.alternate, 1)
-                if (shift == ShiftState.ONCE) shift = ShiftState.OFF
-                reloadKeyboard()
-                refreshSuggestions()
+                val symbol = key.alternate ?: return
+                commitChar(ic, WordSpan.insertion(symbol))
             }
         }
     }
@@ -410,8 +456,11 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         undo = null
         swipeCommitted = null
         if (value.length == 1 && value[0] in ".!?,") {
+            val token = currentWord()
             correctCurrentWord(ic, trailing = value)
-            if (settings.autoCapitalise && value[0] in ".!?") shift = ShiftState.ONCE
+            if (settings.autoCapitalise && WordSpan.capitaliseAfter(value[0], token)) {
+                shift = ShiftState.ONCE
+            }
         } else {
             ic.commitText(value, 1)
             if (shift == ShiftState.ONCE && value.any { it.isLetter() }) shift = ShiftState.OFF
@@ -446,6 +495,11 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private fun correctCurrentWord(ic: InputConnection, trailing: String) {
         val word = currentWord()
+        if (WordSpan.leaveAsTyped(word)) {
+            ic.commitText(WordSpan.insertion(trailing), 1)
+            undo = null
+            return
+        }
         val beforeWord = ic.getTextBeforeCursor(word.length + 24, 0)?.toString().orEmpty().dropLast(word.length)
         val known = wordIsKnown(word) || TypingEdits.capitalisedName(word, beforeWord)
         val choice = if (!suppressSuggest && settings.autocorrect) {
@@ -680,6 +734,12 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             return
         }
         val word = currentWord()
+        if (WordSpan.leaveAsTyped(word)) {
+            ranked = emptyList()
+            shown = listOf(null, null, null)
+            suggestionViews.forEach { it.text = "" }
+            return
+        }
         if (word.isEmpty()) {
             ranked = emptyList()
             shown = listOf(null, null, null)
@@ -702,6 +762,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val suggestion = shown.getOrNull(index) ?: return
         val ic = currentInputConnection ?: return
         val word = currentWord()
+        if (WordSpan.leaveAsTyped(word)) return
         val committed = swipeCommitted
         if (word.isEmpty() && committed != null) {
             val token = "$committed "
@@ -942,7 +1003,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private fun currentWord(): String {
         val before = currentInputConnection?.getTextBeforeCursor(80, 0)?.toString().orEmpty()
-        return before.takeLastWhile { it.isLetter() || it == '\'' || it == '’' || it == '-' }
+        return WordSpan.ending(before)
     }
 
     private fun lexicon(language: KeyboardLanguage): Lexicon = lexicons.getOrPut(language.code) {

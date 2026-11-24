@@ -38,7 +38,7 @@ object KeyboardModel {
 
     private val symbolRows = listOf(
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
-        listOf("@", "#", "₵", "$", "%", "&", "-", "+", "(", ")"),
+        listOf("@", "#", "$", "%", "&", "-", "_", "+", "(", ")"),
     )
 
     val emoji: List<String> = listOf(
@@ -102,7 +102,7 @@ object KeyboardModel {
                 KeySpec("😊", KeyAction.EMOJI, weight = 1.1f, role = KeySpec.Role.ACTION),
                 KeySpec(",", KeyAction.CHAR, ",", weight = 1f),
                 KeySpec(spaceLabel, KeyAction.SPACE, " ", weight = 4.6f, role = KeySpec.Role.SPACE, alternate = "lang"),
-                KeySpec(".", KeyAction.CHAR, ".", weight = 1f, alternate = ","),
+                KeySpec(".", KeyAction.CHAR, ".", weight = 1f, alternate = "_"),
                 KeySpec(enterLabel, KeyAction.ENTER, weight = 1.6f, role = KeySpec.Role.ACCENT),
             ),
         )
@@ -113,7 +113,14 @@ object KeyboardModel {
         val punctuation = listOf("'", "\"", ":", ";", "!", "?", "/", "₵", "…")
         return listOf(
             symbolRows[0].map { KeySpec(it, KeyAction.CHAR, it) },
-            symbolRows[1].map { KeySpec(it, KeyAction.CHAR, it) },
+            symbolRows[1].map { symbol ->
+                KeySpec(
+                    label = symbol,
+                    action = KeyAction.CHAR,
+                    value = symbol,
+                    alternate = if (symbol == "-") "_" else null,
+                )
+            },
             listOf(KeySpec(",", KeyAction.CHAR, ",", weight = 1.2f, role = KeySpec.Role.ACTION)) +
                 punctuation.map { KeySpec(it, KeyAction.CHAR, it) } +
                 listOf(KeySpec("⌫", KeyAction.BACKSPACE, weight = 1.35f, repeat = true, role = KeySpec.Role.ACTION)),
