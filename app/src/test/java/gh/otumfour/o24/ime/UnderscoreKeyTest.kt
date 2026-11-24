@@ -13,10 +13,8 @@ class UnderscoreKeyTest {
     fun underscoreSitsBesideHyphenOnTheSymbolPage() {
         val rows = KeyboardModel.rows(BoardPage.SYMBOLS, KeyboardLanguage.ENGLISH, ShiftState.OFF, "Enter")
         val symbolRow = rows.first { line -> line.any { it.value == "-" } }
-        val hyphenAt = symbolRow.indexOfFirst { it.value == "-" }
-        assertTrue(hyphenAt >= 0)
-        assertEquals("_", symbolRow[hyphenAt + 1].value)
-        assertEquals("_", symbolRow[hyphenAt].alternate)
+        assertEquals(listOf("@", "#", "$", "_", "&", "-", "+", "(", ")", "/"), symbolRow.map { it.value })
+        assertEquals("_", symbolRow.first { it.value == "-" }.alternate)
         assertTrue(rows.flatten().any { it.value == "_" })
     }
 

@@ -23,6 +23,9 @@ data class O24Settings(
     val letterSize: LetterSize = LetterSize.NORMAL,
     val backgroundStrength: BackgroundStrength = BackgroundStrength.SOFT,
     val keyPreview: Boolean = true,
+    val keyboardScale: Float = 1f,
+    val hand: String = "center",
+    val toolbar: String = "",
 )
 
 class SettingsStore(context: Context) {
@@ -58,6 +61,9 @@ class SettingsStore(context: Context) {
             letterSize = LetterSize.fromStorage(prefs.getString(KEY_LETTER_SIZE, null)),
             backgroundStrength = BackgroundStrength.fromStorage(prefs.getString(KEY_BACKGROUND, null)),
             keyPreview = prefs.getBoolean(KEY_PREVIEW, true),
+            keyboardScale = prefs.getFloat(KEY_SCALE, 1f),
+            hand = prefs.getString(KEY_HAND, "center").orEmpty().ifBlank { "center" },
+            toolbar = prefs.getString(KEY_TOOLBAR, "").orEmpty(),
         )
     }
 
@@ -98,6 +104,9 @@ class SettingsStore(context: Context) {
             .putString(KEY_LETTER_SIZE, next.letterSize.storage)
             .putString(KEY_BACKGROUND, next.backgroundStrength.storage)
             .putBoolean(KEY_PREVIEW, next.keyPreview)
+            .putFloat(KEY_SCALE, next.keyboardScale)
+            .putString(KEY_HAND, next.hand)
+            .putString(KEY_TOOLBAR, next.toolbar)
             .commit()
     }
 
@@ -128,6 +137,9 @@ class SettingsStore(context: Context) {
         const val KEY_LETTER_SIZE = "letter_size"
         const val KEY_BACKGROUND = "background_strength"
         const val KEY_PREVIEW = "key_preview"
+        const val KEY_SCALE = "keyboard_scale"
+        const val KEY_HAND = "hand"
+        const val KEY_TOOLBAR = "toolbar"
         const val KEY_ONBOARDED = "onboarded"
         const val KEY_ONBOARDING_PAGE = "onboarding_page"
         const val KEY_DEVELOPER = "developer"

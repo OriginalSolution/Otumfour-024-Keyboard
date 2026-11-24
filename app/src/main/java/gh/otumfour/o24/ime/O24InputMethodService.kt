@@ -28,6 +28,7 @@ import android.widget.TextView
 import android.widget.Toast
 import gh.otumfour.o24.ai.AiClient
 import gh.otumfour.o24.ai.AiResult
+import gh.otumfour.o24.data.ClipboardHistory
 import gh.otumfour.o24.data.LearnedWords
 import gh.otumfour.o24.data.O24Settings
 import gh.otumfour.o24.data.SettingsStore
@@ -84,6 +85,9 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private var shown: List<Suggestion?> = listOf(null, null, null)
     private var root: LinearLayout? = null
     private var keyboard: KeyboardView? = null
+    private var boardController: BoardController? = null
+    private var gifEnabled = false
+    private var gifNoted = false
     private var suggestionViews: List<TextView> = emptyList()
     private var statusView: TextView? = null
     private var hairline: View? = null
@@ -146,7 +150,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             if (::store.isInitialized) settings = store.get()
             enterLabel = enterLabel(info)
             suppressSuggest = isPassword(info) || isNumber(info)
-            page = if (isNumber(info)) BoardPage.SYMBOLS else BoardPage.LETTERS
+            page = if (isNumber(info)) BoardPage.NUMPAD else BoardPage.LETTERS
             shift = if (wantsCaps(info)) ShiftState.ONCE else ShiftState.OFF
             undo = null
             rejected.clear()
@@ -155,6 +159,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             reloadKeyboard()
             applyNavigationPadding(null)
             refreshSuggestions()
+            consumeVoice()
         } catch (error: Throwable) {
             rememberFailure("onStartInputView", error)
         }
@@ -259,44 +264,31 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             matchWrap(),
         )
 
-        val toolbar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(6), dp(4), dp(6), dp(4))
-            setBackgroundColor(colors.toolbarBg)
-        }
-        languageButton = pill("EN").also { button ->
-            button.setOnClickListener { cycleLanguage() }
-            button.setOnLongClickListener {
-                showLanguagePopup(button)
-                true
-            }
-            toolbar.addView(button)
-        }
-        toolbar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
-        toolbar.addView(pill("AI").also { it.setOnClickListener { onAi() } }, marginStart())
-        toolbar.addView(pill("Translate").also { it.setOnClickListener { onTranslate() } }, marginStart())
-        toolbar.addView(pill("⚙").also { button ->
-            button.setOnClickListener { showThemePicker(button) }
-            button.setOnLongClickListener {
-                openSettings()
-                true
-            }
-        }, marginStart())
-        column.addView(
-            HorizontalScrollView(this).apply {
-                isHorizontalScrollBarEnabled = false
-                addView(toolbar)
-            },
-            matchWrap(),
-        )
+        val controller = BoardController(this, boardBridge())
+        controller.attach(column)
+        boardController = controller
+        languageButton = controller.toolbar.getChildAt(0) as? Button
 
         keyboard = KeyboardView(this).also { board ->
         board.onKey = { key -> onKey(key) }
         board.onAlternate = { key -> onAlternate(key) }
+        board.onExtra = { text ->
+            currentInputConnection?.let { commitChar(it, WordSpan.insertion(text)) }
+        }
         board.onSwipe = { samples, keys, width -> onSwipe(samples, keys, width) }
         board.hapticEnabled = settings.haptic
             column.addView(board, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        scope.launch(Dispatchers.IO) {
+            val reply = GifClient.search("")
+            withContext(Dispatchers.Main) {
+                gifEnabled = reply is GifReply.Ready
+                if (reply is GifReply.MissingKey && !gifNoted) {
+                    gifNoted = true
+                    showStatus("GIFs need the ${reply.keyName} secret on the server.")
+                }
+                boardController?.rebuildToolbar()
+            }
         }
         reloadKeyboard()
         applyNavigationPadding(null)
@@ -365,6 +357,12 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         board.keyHeight = settings.keyHeight
         board.letterSize = settings.letterSize
         board.backgroundStrength = settings.backgroundStrength
+        board.heightScale = settings.keyboardScale
+        board.handedness = when (settings.hand) {
+            "left" -> Handedness.LEFT
+            "right" -> Handedness.RIGHT
+            else -> Handedness.CENTER
+        }
         board.swipeEnabled = settings.swipeTyping && !suppressSuggest
         board.rows = KeyboardModel.rows(page, settings.language, shift, enterLabel, colors.spaceTitle)
         val photo = colors.photoAsset
@@ -383,6 +381,158 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         statusView?.setTextColor(colors.suggestionText)
         styleToolbar()
         languageButton?.text = settings.language.shortLabel
+        boardController?.rebuildToolbar()
+        languageButton = boardController?.toolbar?.getChildAt(0) as? Button
+        val symbols = page == BoardPage.SYMBOLS || page == BoardPage.SYMBOLS_MORE
+        boardController?.showRecents(symbols && boardController?.searching != true)
+    }
+
+    private fun boardBridge() = object : BoardController.Bridge {
+        override fun commit(text: String) {
+            currentInputConnection?.let { commitChar(it, WordSpan.insertion(text)) }
+        }
+        override fun backspace() {
+            val ic = currentInputConnection ?: return
+            if (!revertCorrection(ic)) deleteBackward(ic)
+        }
+        override fun colors() = colorsFor(settings.theme)
+        override fun openSettings() = this@O24InputMethodService.openSettings()
+        override fun openThemes(anchor: View) = showThemePicker(anchor)
+        override fun openAi() = onAi()
+        override fun openTranslate() = onTranslate()
+        override fun openMic() = startVoice()
+        override fun shareSelection() = shareText()
+        override fun edit(command: String) = editText(command)
+        override fun setHand(hand: String) {
+            store.update { it.copy(hand = hand) }
+            settings = store.get()
+            reloadKeyboard()
+        }
+        override fun setScale(scale: Float) {
+            store.update { it.copy(keyboardScale = scale.coerceIn(0.8f, 1.35f)) }
+            settings = store.get()
+            reloadKeyboard()
+        }
+        override fun currentScale() = settings.keyboardScale
+        override fun toolbarOrder() = ToolbarItem.parse(settings.toolbar)
+        override fun saveToolbar(order: List<ToolbarItem>) {
+            store.update { it.copy(toolbar = ToolbarItem.join(order)) }
+            settings = store.get()
+        }
+        override fun clips() = ClipboardHistory(this@O24InputMethodService)
+        override fun recentEmoji(): List<String> {
+            val saved = getSharedPreferences(EMOJI_PREFS, MODE_PRIVATE).getString(EMOJI_KEY, null)
+                ?.split('\u001F').orEmpty().filter { it.isNotBlank() }
+            return (saved + listOf("😀", "😂", "❤️", "👍", "🇬🇭", "🙏", "🔥", "✨")).distinct().take(12)
+        }
+        override fun rememberEmoji(emoji: String) {
+            val next = listOf(emoji) + recentEmoji().filter { it != emoji }
+            getSharedPreferences(EMOJI_PREFS, MODE_PRIVATE).edit()
+                .putString(EMOJI_KEY, next.take(16).joinToString("\u001F"))
+                .apply()
+        }
+        override fun gifEnabled() = gifEnabled
+        override fun loadGifs(query: String) {
+            scope.launch(Dispatchers.IO) {
+                val reply = GifClient.search(query)
+                withContext(Dispatchers.Main) {
+                    when (reply) {
+                        is GifReply.Ready -> boardController?.showGifHits(reply.hits)
+                        is GifReply.MissingKey -> {
+                            gifEnabled = false
+                            boardController?.rebuildToolbar()
+                            showStatus("GIFs need the ${reply.keyName} secret on the server.")
+                        }
+                        is GifReply.Failed -> showStatus(reply.message)
+                    }
+                }
+            }
+        }
+        override fun insertGif(hit: GifHit) {
+            scope.launch(Dispatchers.IO) {
+                val bytes = GifClient.download(hit.gif)
+                val file = bytes?.let { writeMedia("gif-${System.currentTimeMillis()}.gif", it) }
+                withContext(Dispatchers.Main) {
+                    val ic = currentInputConnection
+                    val inserted = file != null && ic != null && MediaInsert.commitFile(this@O24InputMethodService, ic, file, "image/gif")
+                    if (!inserted) ic?.commitText(hit.gif, 1)
+                }
+            }
+        }
+        override fun insertSticker(id: String) {
+            val bitmap = StickerArt.bitmap(id, 256)
+            val dir = java.io.File(cacheDir, "o24-media").apply { mkdirs() }
+            val file = java.io.File(dir, "$id.png")
+            file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            val ic = currentInputConnection
+            val inserted = ic != null && MediaInsert.commitFile(this@O24InputMethodService, ic, file, "image/png")
+            if (!inserted) showStatus("This field does not accept stickers.")
+        }
+        override fun showStatus(message: String) = this@O24InputMethodService.showStatus(message)
+        override fun keysVisible(visible: Boolean) {
+            keyboard?.visibility = if (visible) View.VISIBLE else View.GONE
+        }
+        override fun languageLabel() = settings.language.shortLabel
+        override fun cycleLanguage() = this@O24InputMethodService.cycleLanguage()
+        override fun showLanguages(anchor: View) = showLanguagePopup(anchor)
+    }
+
+    private fun writeMedia(name: String, bytes: ByteArray): java.io.File {
+        val dir = java.io.File(cacheDir, "o24-media").apply { mkdirs() }
+        return java.io.File(dir, name).apply { writeBytes(bytes) }
+    }
+
+    private fun startVoice() {
+        val opened = runCatching {
+            startActivity(Intent(this, VoiceActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess
+        if (!opened) showStatus("Voice typing is not available on this phone.")
+    }
+
+    private fun consumeVoice() {
+        val prefs = getSharedPreferences(VOICE_PREFS, MODE_PRIVATE)
+        val text = prefs.getString(VOICE_KEY, null)?.takeIf { it.isNotBlank() } ?: return
+        prefs.edit().remove(VOICE_KEY).apply()
+        currentInputConnection?.commitText(text, 1)
+    }
+
+    private fun shareText() {
+        val ic = currentInputConnection
+        val text = ic?.getSelectedText(0)?.toString()?.takeIf { it.isNotBlank() }
+            ?: ic?.getTextBeforeCursor(240, 0)?.toString().orEmpty()
+        if (text.isBlank()) {
+            showStatus("Nothing to share.")
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(Intent.createChooser(send, "Share").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+
+    private fun editText(command: String) {
+        val ic = currentInputConnection ?: return
+        when (command) {
+            "left" -> moveCursor(ic, -1)
+            "right" -> moveCursor(ic, 1)
+            "select" -> {
+                val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) ?: return
+                val end = extracted.selectionEnd
+                ic.setSelection((extracted.selectionStart - 1).coerceAtLeast(0), end)
+            }
+            "all" -> ic.performContextMenuAction(android.R.id.selectAll)
+            "copy" -> {
+                val selected = ic.getSelectedText(0)?.toString().orEmpty()
+                ic.performContextMenuAction(android.R.id.copy)
+                if (selected.isNotBlank()) ClipboardHistory(this).add(selected)
+            }
+            "paste" -> ic.performContextMenuAction(android.R.id.paste)
+        }
+    }
+
+    private fun moveCursor(ic: InputConnection, delta: Int) {
+        val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0) ?: return
+        val next = (extracted.selectionStart + delta).coerceAtLeast(0)
+        ic.setSelection(next, next)
     }
 
     private fun styleToolbar() {
@@ -399,6 +549,16 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     }
 
     private fun onKey(key: KeySpec) {
+        val controller = boardController
+        if (controller?.searching == true) {
+            when (key.action) {
+                KeyAction.CHAR -> controller.acceptSearch(key.value)
+                KeyAction.BACKSPACE -> controller.acceptSearch("\b")
+                KeyAction.MODE, KeyAction.ENTER -> controller.closeSearch()
+                else -> Unit
+            }
+            return
+        }
         val ic = currentInputConnection ?: return
         when (key.action) {
             KeyAction.CHAR -> commitChar(ic, key.value)
@@ -421,16 +581,22 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             }
             KeyAction.SPACE -> commitSpace(ic)
             KeyAction.MODE -> {
+                page = if (page == BoardPage.LETTERS) BoardPage.SYMBOLS else BoardPage.LETTERS
+                controller?.closePanel()
+                reloadKeyboard()
+            }
+            KeyAction.SYMBOL_PAGE -> {
                 page = when (page) {
-                    BoardPage.LETTERS -> BoardPage.SYMBOLS
-                    BoardPage.SYMBOLS, BoardPage.EMOJI -> BoardPage.LETTERS
+                    BoardPage.SYMBOLS -> BoardPage.SYMBOLS_MORE
+                    else -> BoardPage.SYMBOLS
                 }
                 reloadKeyboard()
             }
-            KeyAction.EMOJI -> {
-                page = if (page == BoardPage.EMOJI) BoardPage.LETTERS else BoardPage.EMOJI
+            KeyAction.NUMPAD -> {
+                page = BoardPage.NUMPAD
                 reloadKeyboard()
             }
+            KeyAction.EMOJI -> controller?.open("emoji")
             KeyAction.LANGUAGE -> cycleLanguage()
         }
     }
@@ -1098,5 +1264,9 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
 
     private companion object {
         const val TAG = "O24IME"
+        const val EMOJI_PREFS = "o24_emoji"
+        const val EMOJI_KEY = "recent"
+        const val VOICE_PREFS = "o24_voice"
+        const val VOICE_KEY = "pending"
     }
 }

@@ -69,7 +69,18 @@ class KeyboardView @JvmOverloads constructor(
 
     var onKey: (KeySpec) -> Unit = {}
     var onAlternate: (KeySpec) -> Unit = {}
+    var onExtra: (String) -> Unit = {}
     var onSwipe: (List<SwipeSample>, List<SwipeKey>, Float) -> Unit = { _, _, _ -> }
+    var handedness: Handedness = Handedness.CENTER
+        set(value) {
+            field = value
+            requestLayout()
+        }
+    var heightScale: Float = 1f
+        set(value) {
+            field = value.coerceIn(0.8f, 1.35f)
+            requestLayout()
+        }
     var hapticEnabled: Boolean = true
     var soundEnabled: Boolean = false
     var previewEnabled: Boolean = true
@@ -138,12 +149,23 @@ class KeyboardView @JvmOverloads constructor(
     private val longRunnable = Runnable {
         val item = pressed ?: return@Runnable
         val key = item.key
-        if (key.alternate != null) {
+        if (key.alternate == "lang") {
             longFired = true
             handler.removeCallbacks(repeatRunnable)
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            showPreview(item, key.alternate)
             onAlternate(key)
+            return@Runnable
+        }
+        val choices = key.choices()
+        if (choices.isEmpty()) return@Runnable
+        longFired = true
+        handler.removeCallbacks(repeatRunnable)
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        if (choices.size == 1) {
+            showPreview(item, choices[0])
+            onExtra(choices[0])
+        } else {
+            showChoices(item, choices)
         }
     }
 
@@ -165,7 +187,8 @@ class KeyboardView @JvmOverloads constructor(
             val (rawBg, fg, border) = paintsFor(key, item.row, themeColors, down)
             val bg = KeyCap.ensure(rawBg, fg)
             fill.color = bg
-            canvas.drawRoundRect(rect, radius, radius, fill)
+            val corner = if (key.round) min(rect.width(), rect.height()) / 2f else radius
+            canvas.drawRoundRect(rect, corner, corner, fill)
             if (themeColors.stoneKeys && key.role != KeySpec.Role.ACCENT) stone(canvas, rect, key.label)
             if (border != 0) {
                 stroke.color = border
@@ -216,10 +239,11 @@ class KeyboardView @JvmOverloads constructor(
             }
             label.textAlign = Paint.Align.CENTER
             label.textSize = min(wanted, rect.height() * 0.72f)
-            key.alternate?.takeIf { hint -> hint.length == 1 && hint != key.label }?.let { hint ->
+            val hint = key.hint ?: key.alternate?.takeIf { it.length == 1 && it != key.label && it != "lang" }
+            hint?.let { mark ->
                 label.textAlign = Paint.Align.RIGHT
                 label.textSize = sp(11f)
-                canvas.drawText(hint, rect.right - dp(4f), rect.top + dp(2f) - label.ascent(), label)
+                canvas.drawText(mark, rect.right - dp(4f), rect.top + dp(2f) - label.ascent(), label)
                 label.textAlign = Paint.Align.CENTER
                 label.textSize = min(wanted, rect.height() * 0.72f)
             }
@@ -229,7 +253,8 @@ class KeyboardView @JvmOverloads constructor(
                 drawKenteCap(canvas, rect.centerX() - textWidth / 2f - dp(16f), rect.centerY())
                 drawKenteCap(canvas, rect.centerX() + textWidth / 2f + dp(16f), rect.centerY())
             }
-            canvas.drawText(key.label, rect.centerX(), baseline, label)
+            if (key.icon != null) drawKeyIcon(canvas, rect, key.icon, fg)
+            else canvas.drawText(key.label, rect.centerX(), baseline, label)
         }
         drawTrail(canvas)
     }
@@ -390,9 +415,15 @@ class KeyboardView @JvmOverloads constructor(
         val usableH = height - pad * 2 - topExtra - gap * (rows.size - 1)
         val rowH = (usableH / rows.size).coerceAtMost(preferredRowHeight())
         val cap = keyCap()
+        val span = if (handedness == Handedness.CENTER) width - pad * 2 else width * 0.78f
+        val leftEdge = when (handedness) {
+            Handedness.LEFT, Handedness.CENTER -> pad
+            Handedness.RIGHT -> width - pad - span
+        }
+        val rightEdge = leftEdge + span
         var y = pad + topExtra
         rows.forEachIndexed { index, row ->
-            placeRow(row, pad, width - pad, y, rowH, gap, cap, index)
+            placeRow(row, leftEdge, rightEdge, y, rowH, gap, cap, index)
             y += rowH + gap
         }
     }
@@ -606,6 +637,84 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun hidePreview() {
         runCatching { previewWindow?.dismiss() }
+        runCatching { choiceWindow?.dismiss() }
+    }
+
+    private var choiceWindow: PopupWindow? = null
+
+    private fun showChoices(item: Placed, choices: List<String>) {
+        val row = android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt(), dp(4f).toInt())
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12f)
+                val themeColors = this@KeyboardView.colors
+                setColor(KeyCap.ensure(themeColors?.keyFill ?: Color.BLACK, themeColors?.keyLabel ?: Color.WHITE))
+            }
+        }
+        choices.forEach { choice ->
+            val button = TextView(context).apply {
+                text = choice
+                setTextColor(this@KeyboardView.colors?.keyLabel ?: Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                typeface = Typeface.DEFAULT_BOLD
+                setPadding(dp(12f).toInt(), dp(8f).toInt(), dp(12f).toInt(), dp(8f).toInt())
+                setOnClickListener {
+                    onExtra(choice)
+                    hidePreview()
+                }
+            }
+            row.addView(button)
+        }
+        val window = PopupWindow(row, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        window.isOutsideTouchable = true
+        choiceWindow = window
+        val location = IntArray(2)
+        getLocationInWindow(location)
+        runCatching {
+            window.showAtLocation(this, Gravity.NO_GRAVITY, location[0] + item.rect.left.toInt(), location[1] + item.rect.top.toInt() - dp(56f).toInt())
+        }
+    }
+
+    private fun drawKeyIcon(canvas: Canvas, rect: RectF, icon: KeyIcon, color: Int) {
+        stroke.color = color
+        stroke.style = Paint.Style.STROKE
+        stroke.strokeWidth = dp(2f)
+        stroke.strokeCap = Paint.Cap.ROUND
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val r = min(rect.width(), rect.height()) * 0.22f
+        when (icon) {
+            KeyIcon.SEARCH -> {
+                canvas.drawCircle(cx - r * 0.25f, cy - r * 0.15f, r, stroke)
+                canvas.drawLine(cx + r * 0.5f, cy + r * 0.55f, cx + r * 1.3f, cy + r * 1.25f, stroke)
+            }
+            KeyIcon.SEND -> {
+                val path = Path()
+                path.moveTo(cx - r, cy + r * 0.2f)
+                path.lineTo(cx + r * 1.2f, cy)
+                path.lineTo(cx - r, cy - r)
+                path.close()
+                fill.color = color
+                canvas.drawPath(path, fill)
+            }
+            KeyIcon.DONE -> {
+                canvas.drawLine(cx - r, cy, cx - r * 0.2f, cy + r * 0.8f, stroke)
+                canvas.drawLine(cx - r * 0.2f, cy + r * 0.8f, cx + r * 1.1f, cy - r * 0.7f, stroke)
+            }
+            KeyIcon.NEXT, KeyIcon.GO -> {
+                canvas.drawLine(cx - r, cy, cx + r, cy, stroke)
+                canvas.drawLine(cx + r * 0.2f, cy - r * 0.7f, cx + r, cy, stroke)
+                canvas.drawLine(cx + r * 0.2f, cy + r * 0.7f, cx + r, cy, stroke)
+            }
+            KeyIcon.ENTER -> {
+                canvas.drawLine(cx - r * 0.2f, cy - r, cx - r * 0.2f, cy + r * 0.4f, stroke)
+                canvas.drawLine(cx - r * 0.2f, cy + r * 0.4f, cx + r, cy + r * 0.4f, stroke)
+                canvas.drawLine(cx + r * 0.3f, cy - r * 0.2f, cx + r, cy + r * 0.4f, stroke)
+                canvas.drawLine(cx + r * 0.3f, cy + r, cx + r, cy + r * 0.4f, stroke)
+            }
+        }
+        stroke.style = Paint.Style.STROKE
     }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
@@ -625,10 +734,12 @@ class KeyboardView @JvmOverloads constructor(
         // Navigation-bar padding lives on the input view, so the background can
         // run behind the bar. Do not add that inset to the key block again.
         val rowH = preferredRowHeight()
-        val wanted = (rowH * rowsCount + dp(10f)).toInt()
+        val wanted = ((rowH * rowsCount + dp(10f)) * heightScale).toInt()
         val mode = MeasureSpec.getMode(heightMeasureSpec)
         val spec = MeasureSpec.getSize(heightMeasureSpec)
         val height = if (mode == MeasureSpec.EXACTLY && spec > 0) spec else wanted
         setMeasuredDimension(width, height.coerceAtLeast((dp(40f) * 4).toInt()))
     }
 }
+
+enum class Handedness { LEFT, CENTER, RIGHT }
