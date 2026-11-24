@@ -67,10 +67,26 @@ class SettingsStore(context: Context) {
         )
     }
 
-    fun isOnboarded(): Boolean = prefs.getBoolean(KEY_ONBOARDED, false)
+    fun isOnboarded(): Boolean =
+        prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false) || prefs.getBoolean(KEY_ONBOARDED, false)
 
-    /** Synchronous so the next activity sees the flag before it decides where to go. */
-    fun setOnboarded(): Boolean = prefs.edit().putBoolean(KEY_ONBOARDED, true).commit()
+    /** Synchronous so a recreated activity sees the flag before it decides where to go. */
+    fun setOnboarded(): Boolean = prefs.edit()
+        .putBoolean(KEY_ONBOARDED, true)
+        .putBoolean(KEY_ONBOARDING_COMPLETE, true)
+        .commit()
+
+    fun clearOnboarded(): Boolean = prefs.edit()
+        .putBoolean(KEY_ONBOARDED, false)
+        .putBoolean(KEY_ONBOARDING_COMPLETE, false)
+        .putBoolean(KEY_CLOSE_WHEN_ACTIVE, false)
+        .putInt(KEY_ONBOARDING_PAGE, 0)
+        .commit()
+
+    fun closeWhenActive(): Boolean = prefs.getBoolean(KEY_CLOSE_WHEN_ACTIVE, false)
+
+    fun setCloseWhenActive(close: Boolean): Boolean =
+        prefs.edit().putBoolean(KEY_CLOSE_WHEN_ACTIVE, close).commit()
 
     fun onboardingPage(): Int = prefs.getInt(KEY_ONBOARDING_PAGE, 0)
 
@@ -141,6 +157,8 @@ class SettingsStore(context: Context) {
         const val KEY_HAND = "hand"
         const val KEY_TOOLBAR = "toolbar"
         const val KEY_ONBOARDED = "onboarded"
+        const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
+        const val KEY_CLOSE_WHEN_ACTIVE = "close_when_active"
         const val KEY_ONBOARDING_PAGE = "onboarding_page"
         const val KEY_DEVELOPER = "developer"
     }

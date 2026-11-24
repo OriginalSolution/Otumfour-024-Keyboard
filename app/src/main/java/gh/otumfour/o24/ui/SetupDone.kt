@@ -2,11 +2,14 @@ package gh.otumfour.o24.ui
 
 enum class ImeReadiness { NOT_ENABLED, NOT_DEFAULT, READY }
 
-enum class DoneStep { ADVANCE, OPEN_INPUT_SETTINGS, SHOW_IME_PICKER, LAND_HOME }
+enum class DoneStep { ADVANCE, OPEN_INPUT_SETTINGS, SHOW_IME_PICKER, CLOSE }
+
+enum class LaunchDestination { ONBOARDING, SETTINGS_HOME }
 
 /**
- * Done on the last settings page never sends the pager back to page 0.
- * It enables the keyboard, asks for the default, or lands on Home when both are done.
+ * Done never sends the pager back to page 0.
+ * It enables the keyboard, asks for the default, or closes the app when Otumfour is already active.
+ * A later launcher open goes to Settings Home, not the welcome steps, unless setup is run again.
  */
 object SetupDone {
     fun readiness(enabled: Boolean, isDefault: Boolean): ImeReadiness = when {
@@ -21,9 +24,19 @@ object SetupDone {
         return done(readiness)
     }
 
+    fun launchDestination(onboarded: Boolean, runAgain: Boolean): LaunchDestination = when {
+        runAgain -> LaunchDestination.ONBOARDING
+        onboarded -> LaunchDestination.SETTINGS_HOME
+        else -> LaunchDestination.ONBOARDING
+    }
+
+    /** Close only after Done, and only once the keyboard is enabled and the default. */
+    fun shouldClose(closeWhenActive: Boolean, readiness: ImeReadiness): Boolean =
+        closeWhenActive && readiness == ImeReadiness.READY
+
     private fun done(readiness: ImeReadiness): DoneStep = when (readiness) {
         ImeReadiness.NOT_ENABLED -> DoneStep.OPEN_INPUT_SETTINGS
         ImeReadiness.NOT_DEFAULT -> DoneStep.SHOW_IME_PICKER
-        ImeReadiness.READY -> DoneStep.LAND_HOME
+        ImeReadiness.READY -> DoneStep.CLOSE
     }
 }

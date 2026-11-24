@@ -1,7 +1,9 @@
 package gh.otumfour.o24.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SetupDoneTest {
@@ -21,9 +23,24 @@ class SetupDoneTest {
             SetupDone.onPrimary(last, SettingsPages.COUNT, ImeReadiness.NOT_DEFAULT),
         )
         assertEquals(
-            DoneStep.LAND_HOME,
+            DoneStep.CLOSE,
             SetupDone.onPrimary(last, SettingsPages.COUNT, ImeReadiness.READY),
         )
+    }
+
+    @Test
+    fun launcherOpensSettingsHomeAfterSetup() {
+        assertEquals(LaunchDestination.SETTINGS_HOME, SetupDone.launchDestination(onboarded = true, runAgain = false))
+        assertEquals(LaunchDestination.ONBOARDING, SetupDone.launchDestination(onboarded = false, runAgain = false))
+        assertEquals(LaunchDestination.ONBOARDING, SetupDone.launchDestination(onboarded = true, runAgain = true))
+    }
+
+    @Test
+    fun theAppClosesOnlyWhenDoneIsWaitingAndTheKeyboardIsActive() {
+        assertTrue(SetupDone.shouldClose(closeWhenActive = true, ImeReadiness.READY))
+        assertFalse(SetupDone.shouldClose(closeWhenActive = true, ImeReadiness.NOT_ENABLED))
+        assertFalse(SetupDone.shouldClose(closeWhenActive = true, ImeReadiness.NOT_DEFAULT))
+        assertFalse(SetupDone.shouldClose(closeWhenActive = false, ImeReadiness.READY))
     }
 
     @Test
