@@ -50,7 +50,7 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleDebug testDebugUnitTest --stacktrace
 
-      - name: Assemble release APK
+      - name: Assemble release APK and app bundle
         id: release
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -59,12 +59,14 @@ jobs:
         run: |
           # Unset secrets arrive as empty strings and would override the test key.
           # Keep them only when a real keystore file was produced from KEYSTORE_BASE64.
+          # bundleRelease uses the same release signingConfig as assembleRelease,
+          # so the AAB upload key matches app-release.apk.
           if [ -z "${KEYSTORE_FILE:-}" ]; then
             unset KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD
           fi
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleRelease bundleRelease --stacktrace
 
-      - name: Upload APKs
+      - name: Upload APKs and app bundle
         if: always() && steps.debug.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
@@ -72,6 +74,7 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
       - name: GitHub Release
@@ -83,10 +86,11 @@ jobs:
           files: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
           body: |
             Otumfour is an Android input method made in honour of the Asantehene. It is not a publication of Manhyia Palace. The welcome slide uses one credited photograph of Otumfuo; the keyboard does not depict a person. Where a tagline needs a number, it is written 024.
 
-            Install the debug APK to try it, or the release APK signed with the test key unless repository signing secrets were set. Enable Otumfour in Android settings, then choose it as your input method. The first launch asks you to enable it and pick a theme.
+            Install the debug APK to try it, or the release APK signed with the test key unless repository signing secrets were set. app-release.aab is the Android App Bundle for Google Play, signed with that same key. Enable Otumfour in Android settings, then choose it as your input method. The first launch asks you to enable it and pick a theme.
 
             ## Features
             - QWERTY, shift and caps, numbers and symbols, emoji, backspace, and enter
