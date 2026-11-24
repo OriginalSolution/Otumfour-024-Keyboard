@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "gh.otumfour.o24"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "gh.otumfour.o24"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 11
-        versionName = "1.0.10"
+        targetSdk = 36
+        versionCode = 12
+        versionName = "1.0.11"
         buildConfigField("String", "O24_AI_URL", "\"https://ffqchvmcdstxmjsimgdt.supabase.co/functions/v1/o24-ai\"")
         // Public Supabase anon key for the O24 AI proxy. The OpenAI key stays on the server.
         buildConfigField(

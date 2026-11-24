@@ -9,7 +9,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import kotlin.math.max
 
-/** Draw behind the system bars, then keep content clear of them. */
+/**
+ * API 36 draws every activity edge-to-edge and ignores the old opt-out.
+ * Call this, then [applySystemBarInsets], so settings stay clear of the status and navigation bars.
+ */
 fun ComponentActivity.prepareEdgeToEdge() {
     enableEdgeToEdge()
 }
