@@ -97,7 +97,8 @@ jobs:
             - Swipe typing, with a red-to-gold trail. Autocorrect on space, undone by the next backspace
             - Night and Day, the ten drawn themes, and four photograph themes. Otumfuo Osei Tutu II is the default, and the gear button opens the photo thumbnails
             - Spacebar labelled Manhyia. The app name stays Otumfour
-            - On a wide screen the keyboard splits, as on an unfolded fold
+            - One full-width keyboard on every screen, including an unfolded fold, with one spacebar
+            - Theme pictures faded lightly behind the keys. The Themes page scrolls, and the colour row scrolls sideways
             - Suggestion bar with three candidates. Autocorrect keeps known words and only replaces a one-step slip of a frequent word. Backspace undoes it
             - AI rewrite and translate through Otumfour's server, with no key in the app. Text is sent only when you tap AI or Translate. Settings is an on/off switch
             - Onboarding, settings, and an About page for Otumfuo
