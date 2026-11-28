@@ -6,6 +6,17 @@ enum class DoneStep { ADVANCE, OPEN_INPUT_SETTINGS, SHOW_IME_PICKER, CLOSE }
 
 enum class LaunchDestination { ONBOARDING, SETTINGS_HOME }
 
+enum class PickerPresent { SHOW, WAIT }
+
+/**
+ * The keyboard list can be requested from any onboarding page, including Done.
+ * Without window focus Android ignores the picker, so the request waits.
+ */
+object ImePicker {
+    fun present(hasFocus: Boolean): PickerPresent =
+        if (hasFocus) PickerPresent.SHOW else PickerPresent.WAIT
+}
+
 /**
  * Done never sends the pager back to page 0.
  * It enables the keyboard, asks for the default, or closes the app when Otumfour is already active.

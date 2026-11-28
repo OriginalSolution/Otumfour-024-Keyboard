@@ -29,6 +29,7 @@
     <string name="choose_fallback">Open default keyboard settings</string>
     <string name="choose_skip_step">Skip this step</string>
     <string name="choose_not_yet">Otumfour is not the default keyboard yet. Next still works.</string>
+    <string name="done_pick_otumfour">Otumfour is not the keyboard yet. Choose Otumfour in the list, then this screen will close.</string>
     <string name="choose_picker_missed">If no list appeared, tap Open keyboard settings.</string>
     <string name="choose_samsung">Samsung: Settings, General management, Keyboard list and default, Default keyboard.</string>
     <string name="choose_huawei">Huawei: Settings, System &amp; updates, Language &amp; input, Default keyboard.</string>

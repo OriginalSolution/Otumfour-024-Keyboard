@@ -36,6 +36,12 @@ class SetupDoneTest {
     }
 
     @Test
+    fun thePickerIsAllowedOnTheDonePageAndWaitsForFocus() {
+        assertEquals(PickerPresent.SHOW, ImePicker.present(hasFocus = true))
+        assertEquals(PickerPresent.WAIT, ImePicker.present(hasFocus = false))
+    }
+
+    @Test
     fun theAppClosesOnlyWhenDoneIsWaitingAndTheKeyboardIsActive() {
         assertTrue(SetupDone.shouldClose(closeWhenActive = true, ImeReadiness.READY))
         assertFalse(SetupDone.shouldClose(closeWhenActive = true, ImeReadiness.NOT_ENABLED))
