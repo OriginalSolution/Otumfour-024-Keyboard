@@ -30,11 +30,13 @@ class KeyCapTest {
     }
 
     @Test
-    fun softScrimCoversMostOfThePhoto() {
-        val soft = BackdropPaint.scrimAlpha(BackgroundStrength.SOFT)
-        assertTrue(soft in 153..191)
-        assertTrue(BackdropPaint.scrimAlpha(BackgroundStrength.FULL) < soft)
-        assertEquals(255, BackdropPaint.scrimAlpha(BackgroundStrength.OFF))
+    fun softFadeLeavesThePictureVisible() {
+        val soft = BackdropPaint.pictureAlpha(BackgroundStrength.SOFT)
+        assertTrue(soft in 96..170)
+        assertTrue(BackdropPaint.pictureAlpha(BackgroundStrength.FULL) > soft)
+        assertEquals(0, BackdropPaint.pictureAlpha(BackgroundStrength.OFF))
+        assertTrue(BackdropPaint.scrimAlpha(BackgroundStrength.SOFT) < 90)
+        assertTrue(BackdropPaint.scrimAlpha(BackgroundStrength.FULL) < BackdropPaint.scrimAlpha(BackgroundStrength.SOFT))
         assertTrue(BackdropPaint.blur(BackgroundStrength.SOFT))
         assertEquals(BackgroundStrength.SOFT, BackgroundStrength.fromStorage(null))
     }

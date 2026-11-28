@@ -14,11 +14,21 @@ enum class BackgroundStrength(val storage: String) {
 }
 
 object BackdropPaint {
-    /** Dark veil over a photo. Soft is about two thirds, so the picture stays quiet. */
+    /**
+     * How strongly the picture itself is drawn, before a thin dim.
+     * Soft stays recognisable and light. Full is clearer. Off draws no picture.
+     */
+    fun pictureAlpha(strength: BackgroundStrength): Int = when (strength) {
+        BackgroundStrength.OFF -> 0
+        BackgroundStrength.SOFT -> 132
+        BackgroundStrength.FULL -> 210
+    }
+
+    /** A light dim so the picture never competes with the letters. */
     fun scrimAlpha(strength: BackgroundStrength): Int = when (strength) {
         BackgroundStrength.OFF -> 255
-        BackgroundStrength.SOFT -> 170
-        BackgroundStrength.FULL -> 72
+        BackgroundStrength.SOFT -> 56
+        BackgroundStrength.FULL -> 28
     }
 
     fun blur(strength: BackgroundStrength): Boolean = strength == BackgroundStrength.SOFT

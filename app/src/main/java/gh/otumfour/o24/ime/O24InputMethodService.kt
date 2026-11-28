@@ -304,7 +304,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
         val board = KeyboardView(this).apply {
             theme = ThemeId.GOLDEN_STOOL
             colors = colorsFor(ThemeId.GOLDEN_STOOL)
-            rows = KeyboardModel.rows(BoardPage.LETTERS, KeyboardLanguage.ENGLISH, ShiftState.OFF, "Enter", "Otumfour")
+            rows = KeyboardModel.rows(BoardPage.LETTERS, KeyboardLanguage.ENGLISH, ShiftState.OFF, "Enter", "Manhyia")
             onKey = { key -> onKey(key) }
         }
         keyboard = board

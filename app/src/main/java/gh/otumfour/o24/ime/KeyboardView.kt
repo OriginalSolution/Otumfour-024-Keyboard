@@ -126,7 +126,6 @@ class KeyboardView @JvmOverloads constructor(
     private var swipeHapticSent = false
     private val trail = ArrayList<SwipeSample>()
     private var trailUntil = 0L
-    private var splitMode = false
     private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
@@ -397,15 +396,8 @@ class KeyboardView @JvmOverloads constructor(
 
     private fun layoutKeys() {
         placed.clear()
-        splitMode = false
         if (width == 0 || height == 0 || rows.isEmpty()) return
-        val halves = if (resources.configuration.screenWidthDp >= 600) KeyboardModel.splitRows(rows) else null
-        if (halves != null) {
-            splitMode = true
-            layoutHalves(halves.first, halves.second, halves.third)
-        } else {
-            layoutJoined()
-        }
+        layoutJoined()
     }
 
     private fun layoutJoined() {
@@ -428,31 +420,6 @@ class KeyboardView @JvmOverloads constructor(
         }
     }
 
-    private fun layoutHalves(
-        extra: List<List<KeySpec>>,
-        left: List<List<KeySpec>>,
-        right: List<List<KeySpec>>,
-    ) {
-        val gap = dp(6f)
-        val pad = dp(4f)
-        val gutter = dp(36f)
-        val count = extra.size + maxOf(left.size, right.size).coerceAtLeast(1)
-        val usableH = height - pad * 2 - gap * (count - 1)
-        val rowH = (usableH / count).coerceAtMost(preferredRowHeight())
-        val cap = keyCap()
-        val mid = width / 2f
-        var y = pad
-        extra.forEachIndexed { index, row ->
-            placeRow(row, pad, width - pad, y, rowH, gap, cap, index)
-            y += rowH + gap
-        }
-        for (index in 0 until maxOf(left.size, right.size)) {
-            left.getOrNull(index)?.let { placeRow(it, pad, mid - gutter / 2f, y, rowH, gap, cap, index) }
-            right.getOrNull(index)?.let { placeRow(it, mid + gutter / 2f, width - pad, y, rowH, gap, cap, index) }
-            y += rowH + gap
-        }
-    }
-
     private fun placeRow(
         row: List<KeySpec>,
         left: Float,
@@ -465,10 +432,14 @@ class KeyboardView @JvmOverloads constructor(
     ) {
         val weight = row.sumOf { it.weight.toDouble() }.toFloat().coerceAtLeast(1f)
         val inner = (right - left - gap * (row.size - 1)).coerceAtLeast(1f)
-        var x = left
-        row.forEach { key ->
+        val widths = row.map { key ->
             val raw = inner * (key.weight / weight)
-            val w = if (key.role == KeySpec.Role.LETTER) min(raw, cap) else raw
+            if (key.role == KeySpec.Role.LETTER) min(raw, cap) else raw
+        }
+        val used = widths.sum() + gap * (row.size - 1).coerceAtLeast(0)
+        var x = left + ((right - left - used) / 2f).coerceAtLeast(0f)
+        row.forEachIndexed { keyIndex, key ->
+            val w = widths[keyIndex]
             placed.add(Placed(key, RectF(x, y, x + w, y + rowH), index))
             x += w + gap
         }

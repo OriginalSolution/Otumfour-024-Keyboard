@@ -4,24 +4,23 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
+import kotlin.math.abs
 import gh.otumfour.o24.R
 import gh.otumfour.o24.data.SettingsStore
 import gh.otumfour.o24.theme.ThemeId
-import kotlin.math.abs
-
 /**
- * One theme at a time, with neighbours peeking. Every theme, including Golden Stool Royal,
- * stays in the list so it can be chosen again.
+ * One theme at a time, with neighbours peeking. Every theme stays in the list so it can be chosen again.
  */
 class ThemeCarouselView(context: Context) : LinearLayout(context) {
     private val store = SettingsStore(context)
@@ -42,26 +41,29 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
         name.typeface = android.graphics.Typeface.create("serif", android.graphics.Typeface.BOLD)
         name.gravity = Gravity.CENTER
         name.setPadding(dp(16), dp(10), dp(16), dp(4))
-        addView(name, matchWrap())
 
+        val content = LinearLayout(context).apply { orientation = VERTICAL }
+        content.addView(name, matchWrap())
         val pad = dp(18)
         pager.adapter = CardAdapter()
         pager.offscreenPageLimit = 2
         pager.clipToPadding = false
         pager.clipChildren = false
+        pager.isNestedScrollingEnabled = false
         pager.setPadding(pad, dp(4), pad, dp(4))
         pager.setPageTransformer { page, position ->
             val scale = 0.92f + (1f - abs(position).coerceAtMost(1f)) * 0.08f
             page.scaleY = scale
             page.alpha = 0.72f + (1f - abs(position).coerceAtMost(1f)) * 0.28f
         }
-        addView(pager, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        keepCarouselSwipesInside(pager)
+        val previewHeight = if (resources.configuration.screenHeightDp < 520) dp(168) else dp(210)
+        content.addView(pager, LayoutParams(LayoutParams.MATCH_PARENT, previewHeight))
 
         dots.count = ThemeId.entries.size
-        addView(dots, matchWrap())
+        content.addView(dots, matchWrap())
 
         swatches.orientation = HORIZONTAL
-        swatches.gravity = Gravity.CENTER
         ThemeId.entries.forEachIndexed { index, theme ->
             val dot = View(context).apply {
                 background = GradientDrawable().apply {
@@ -69,33 +71,32 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
                     setColor(swatch(theme))
                     setStroke(dp(1), Color.parseColor("#E8B52D"))
                 }
+                contentDescription = context.getString(theme.titleRes)
                 setOnClickListener { pager.setCurrentItem(index, true) }
             }
-            swatches.addView(dot, LayoutParams(dp(18), dp(18)).apply { marginStart = dp(4); marginEnd = dp(4) })
+            swatches.addView(dot, LayoutParams(dp(28), dp(28)).apply { marginStart = dp(5); marginEnd = dp(5) })
         }
-        addView(HorizontalScrollView(context).apply {
+        content.addView(HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
-            setPadding(dp(12), dp(2), dp(12), dp(2))
-            addView(swatches)
+            isFillViewport = false
+            clipToPadding = false
+            setPadding(dp(12), dp(8), dp(12), dp(4))
+            addView(swatches, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
         }, matchWrap())
 
         history.setTextColor(Color.parseColor("#F6F1E4"))
-        history.textSize = 14f
-        history.setLineSpacing(dp(2).toFloat(), 1.12f)
+        history.textSize = 15f
+        history.setLineSpacing(dp(2).toFloat(), 1.15f)
         val historyCard = o24Card(context) {
             addView(history)
             val read = textButton(context.getString(R.string.learn_more))
             read.setOnClickListener { onReadHistory(current()) }
             addView(read)
         }
-        val historyScroll = ScrollView(context).apply {
-            addView(historyCard)
-            isVerticalScrollBarEnabled = true
-        }
-        addView(historyScroll, LayoutParams(LayoutParams.MATCH_PARENT, dp(132)).apply {
+        content.addView(historyCard, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
             marginStart = dp(16)
             marginEnd = dp(16)
-            topMargin = dp(4)
+            topMargin = dp(8)
         })
 
         styleGold(apply)
@@ -103,12 +104,17 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
             store.update { it.copy(theme = current()) }
             bind(pager.currentItem)
         }
-        addView(apply, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+        content.addView(apply, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
             marginStart = dp(20)
             marginEnd = dp(20)
-            topMargin = dp(8)
-            bottomMargin = dp(12)
+            topMargin = dp(12)
+            bottomMargin = dp(16)
         })
+        addView(NestedScrollView(context).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = true
+            addView(content, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        }, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
 
         pager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) = bind(position)
@@ -116,6 +122,39 @@ class ThemeCarouselView(context: Context) : LinearLayout(context) {
         val start = ThemeId.entries.indexOf(store.get().theme).coerceAtLeast(0)
         pager.setCurrentItem(start, false)
         bind(start)
+    }
+
+    private fun keepCarouselSwipesInside(carousel: ViewPager2) {
+        carousel.post {
+            val recycler = carousel.getChildAt(0) as? RecyclerView ?: return@post
+            recycler.addOnItemTouchListener(object : RecyclerView.SimpleOnItemTouchListener() {
+                var startX = 0f
+                var startY = 0f
+                override fun onInterceptTouchEvent(rv: RecyclerView, event: MotionEvent): Boolean {
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            startX = event.x
+                            startY = event.y
+                            disallowParents(rv, true)
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            val horizontal = abs(event.x - startX) > abs(event.y - startY)
+                            disallowParents(rv, horizontal)
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> disallowParents(rv, false)
+                    }
+                    return false
+                }
+            })
+        }
+    }
+
+    private fun disallowParents(view: View, disallow: Boolean) {
+        var parent = view.parent
+        while (parent != null) {
+            parent.requestDisallowInterceptTouchEvent(disallow)
+            parent = parent.parent
+        }
     }
 
     fun refresh() = bind(pager.currentItem)
