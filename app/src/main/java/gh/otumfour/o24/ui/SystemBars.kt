@@ -1,8 +1,10 @@
 package gh.otumfour.o24.ui
 
+import android.graphics.Color
 import android.util.Log
 import android.view.View
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -14,7 +16,11 @@ import kotlin.math.max
  * Call this, then [applySystemBarInsets], so settings stay clear of the status and navigation bars.
  */
 fun ComponentActivity.prepareEdgeToEdge() {
-    enableEdgeToEdge()
+    // Dark cloth behind the status bar, so the icons stay light.
+    enableEdgeToEdge(
+        statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+    )
 }
 
 fun View.applySystemBarInsets() {

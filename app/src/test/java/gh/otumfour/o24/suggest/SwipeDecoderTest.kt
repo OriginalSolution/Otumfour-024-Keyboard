@@ -45,6 +45,28 @@ class SwipeDecoderTest {
     }
 
     @Test
+    fun helloBeatsHelpEvenWhenHelpIsMuchMoreFrequent() {
+        val lexicon = words.map { (word, freq) ->
+            when (word) {
+                "help" -> word to 666286
+                "hello" -> word to 405534
+                else -> word to freq
+            }
+        }
+        val ranked = SwipeDecoder.rank(glide("helo"), keyList, 100f, lexicon)
+        assertEquals("hello", ranked.firstOrNull())
+    }
+
+    @Test
+    fun commonWordsWinTheirOwnPath() {
+        assertTop("the", glide("the"))
+        assertTop("and", glide("and"))
+        assertTop("good", glide("god"))
+        assertTop("thanks", glide("thanks"))
+        assertTop("hello", glide("helo"))
+    }
+
+    @Test
     fun aContinuousThanksPathIsNotTheCrossedKeys() {
         assertTop("thanks", glide("thanks"))
     }

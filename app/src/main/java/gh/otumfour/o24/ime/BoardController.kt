@@ -281,9 +281,7 @@ class BoardController(
         openPanel()
         panel.removeAllViews()
         if (!bridge.gifEnabled()) {
-            panel.addView(header("GIFs", "Needs the TENOR_API_KEY secret on Otumfour’s server."))
-            panel.addView(pill("ABC") { closePanel() })
-            bridge.showStatus("GIFs need the TENOR_API_KEY secret on the server.")
+            closePanel()
             return
         }
         panel.addView(header("GIFs", searchText.ifEmpty { "Featured" }))

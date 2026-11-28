@@ -38,6 +38,8 @@ class OnboardingActivity : AppCompatActivity() {
     private var sawDefault = false
     private var freezeAdvance = false
     private var pickerRequested = false
+    private var offerPickerOnReturn = false
+    private var doneStatus: TextView? = null
     private var persistPage = false
     private val serviceClass = O24InputMethodService::class.java.name
     private val imeObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -102,15 +104,7 @@ class OnboardingActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        val store = SettingsStore(this)
-        val state = SetupDone.readiness(keyboardEnabled(), keyboardSelected())
-        if (SetupDone.shouldClose(store.closeWhenActive(), state)) {
-            store.setCloseWhenActive(false)
-            finishAndRemoveTask()
-            return
-        }
-        if (store.closeWhenActive() && state == ImeReadiness.NOT_DEFAULT && !pickerRequested) openPicker()
-        refreshIme()
+        continueAfterDone()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -217,11 +211,46 @@ class OnboardingActivity : AppCompatActivity() {
         }
     }
 
+    private fun continueAfterDone() {
+        if (isFinishing || isDestroyed) return
+        val store = SettingsStore(this)
+        val state = SetupDone.readiness(keyboardEnabled(), keyboardSelected())
+        if (SetupDone.shouldClose(store.closeWhenActive(), state)) {
+            store.setCloseWhenActive(false)
+            offerPickerOnReturn = false
+            finishAndRemoveTask()
+            return
+        }
+        if (store.closeWhenActive() && state == ImeReadiness.NOT_DEFAULT && offerPickerOnReturn) {
+            offerPickerOnReturn = false
+            openPicker()
+        } else if (store.closeWhenActive() && state == ImeReadiness.NOT_DEFAULT) {
+            showPickMessage()
+        }
+        refreshIme()
+    }
+
     private fun refreshIme() {
         if (isFinishing || isDestroyed) return
+        val store = SettingsStore(this)
+        val state = SetupDone.readiness(keyboardEnabled(), keyboardSelected())
+        if (SetupDone.shouldClose(store.closeWhenActive(), state)) {
+            store.setCloseWhenActive(false)
+            finishAndRemoveTask()
+            return
+        }
+        if (store.closeWhenActive() && state == ImeReadiness.NOT_DEFAULT && !offerPickerOnReturn && !pickerRequested) {
+            showPickMessage()
+        }
         if (!::pager.isInitialized || !::primary.isInitialized) return
         bindChrome(pager.currentItem)
         maybeAdvance()
+    }
+
+    private fun showPickMessage() {
+        val status = doneStatus ?: return
+        status.visibility = android.view.View.VISIBLE
+        status.text = getString(R.string.done_pick_otumfour)
     }
 
     private fun goBack() {
@@ -242,10 +271,12 @@ class OnboardingActivity : AppCompatActivity() {
         when (SetupDone.readiness(keyboardEnabled(), keyboardSelected())) {
             ImeReadiness.NOT_ENABLED -> {
                 store.setCloseWhenActive(true)
+                offerPickerOnReturn = true
                 startInputSettings()
             }
             ImeReadiness.NOT_DEFAULT -> {
                 store.setCloseWhenActive(true)
+                offerPickerOnReturn = false
                 openPicker()
             }
             ImeReadiness.READY -> {
@@ -301,18 +332,21 @@ class OnboardingActivity : AppCompatActivity() {
 
     /** The picker is ignored on Android 12+ unless this window currently has focus. */
     private fun openPicker() {
-        SettingsStore(this).setOnboardingPage(OnboardingRouter.CHOOSE_PAGE)
+        if (::pager.isInitialized && pager.currentItem == OnboardingRouter.CHOOSE_PAGE) {
+            SettingsStore(this).setOnboardingPage(OnboardingRouter.CHOOSE_PAGE)
+        }
         pickerRequested = true
         window.decorView.post { showPickerIfFocused() }
     }
 
     private fun showPickerIfFocused() {
-        if (!pickerRequested || isFinishing || isDestroyed) {
-            pickerRequested = false
-            return
+        if (!pickerRequested || isFinishing || isDestroyed) return
+        val page = if (::pager.isInitialized) pager.currentItem else 0
+        when (ImePicker.present(hasWindowFocus())) {
+            PickerPresent.WAIT -> return
+            PickerPresent.SHOW -> Unit
         }
-        if (!hasWindowFocus()) return
-        if (::pager.isInitialized && pager.currentItem != 2) {
+        if (page < 0) {
             pickerRequested = false
             return
         }
@@ -320,7 +354,10 @@ class OnboardingActivity : AppCompatActivity() {
         val shown = runCatching {
             getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
         }.isSuccess
-        if (!shown) pickStatus?.text = getString(R.string.choose_picker_missed)
+        if (!shown) {
+            pickStatus?.text = getString(R.string.choose_picker_missed)
+            showPickMessage()
+        }
     }
 
     private fun openKeyboardSettings() {
@@ -467,6 +504,11 @@ class OnboardingActivity : AppCompatActivity() {
         column.addView(o24Card(this) {
             addView(sectionLabel(this@OnboardingActivity, getString(R.string.settings_languages)))
             addView(bodyText(this@OnboardingActivity, getString(R.string.done_language_note)))
+            val status = mutedText(this@OnboardingActivity, "")
+            status.setTextColor(o24Color(O24Color.GOLD))
+            status.visibility = android.view.View.GONE
+            doneStatus = status
+            addView(status)
         })
         val scroll = android.widget.ScrollView(this).apply { isFillViewport = true }
         val center = CenterFrame(this)

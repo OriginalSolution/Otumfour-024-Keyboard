@@ -18,7 +18,11 @@ object SwipeDecoder {
     private const val PAUSE_MS = 170L
     private const val SAMPLES = 32
     private const val START_END_RADIUS = 1.5f
-    private const val FREQUENCY_WEIGHT = 0.08
+    private const val FREQUENCY_WEIGHT = 0.05
+    private const val LOCATION_WEIGHT = 0.45
+    private const val SHAPE_WEIGHT = 0.25
+    private const val END_WEIGHT = 0.7
+    private const val START_WEIGHT = 0.2
 
     fun trace(samples: List<SwipeSample>, keys: List<SwipeKey>, keyWidth: Float): String {
         if (samples.isEmpty() || keys.isEmpty()) return ""
@@ -70,16 +74,20 @@ object SwipeDecoder {
                 val startGap = hypot(first.x - origin.x, first.y - origin.y)
                 val endGap = hypot(last.x - finish.x, last.y - finish.y)
                 if (startGap > radius || endGap > radius) return@mapNotNull null
-                Triple(word, freq, idealPath(word, byLetter))
+                Candidate(word, freq, idealPath(word, byLetter), startGap, endGap)
             }
             .toList()
         if (pool.isEmpty()) return emptyList()
-        val ranked = pool.map { (word, freq, ideal) ->
-            val template = resample(ideal, SAMPLES)
+        val ranked = pool.map { candidate ->
+            val template = resample(candidate.ideal, SAMPLES)
             val location = pointDistance(finger, template) / width
             val shape = pointDistance(centred(finger), centred(template)) / width
-            val prior = ln(freq.coerceAtLeast(1).toDouble()) * FREQUENCY_WEIGHT
-            word to -(0.62 * location + 0.38 * shape) + prior
+            val endCost = candidate.endGap / width
+            val startCost = candidate.startGap / width
+            val prior = ln(candidate.freq.coerceAtLeast(1).toDouble()) * FREQUENCY_WEIGHT
+            // The last key is not averaged away. Ending on o must beat a more frequent word that ends on p.
+            val score = -(LOCATION_WEIGHT * location + SHAPE_WEIGHT * shape + END_WEIGHT * endCost + START_WEIGHT * startCost) + prior
+            candidate.word to score
         }.sortedByDescending { it.second }
         val out = ArrayList<String>(limit)
         for ((word, _) in ranked) {
@@ -155,6 +163,14 @@ object SwipeDecoder {
         }
         return out
     }
+
+    private data class Candidate(
+        val word: String,
+        val freq: Int,
+        val ideal: List<Pair<Float, Float>>,
+        val startGap: Float,
+        val endGap: Float,
+    )
 
     private class Visit(
         val letter: Char,

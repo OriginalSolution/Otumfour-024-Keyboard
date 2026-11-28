@@ -87,7 +87,6 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
     private var keyboard: KeyboardView? = null
     private var boardController: BoardController? = null
     private var gifEnabled = false
-    private var gifNoted = false
     private var suggestionViews: List<TextView> = emptyList()
     private var statusView: TextView? = null
     private var hairline: View? = null
@@ -283,9 +282,8 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
             val reply = GifClient.search("")
             withContext(Dispatchers.Main) {
                 gifEnabled = reply is GifReply.Ready
-                if (reply is GifReply.MissingKey && !gifNoted) {
-                    gifNoted = true
-                    showStatus("GIFs need the ${reply.keyName} secret on the server.")
+                if (reply is GifReply.MissingKey) {
+                    Log.i(TAG, "GIF tab hidden. Server secret ${reply.keyName} is not set.")
                 }
                 boardController?.rebuildToolbar()
             }
@@ -441,7 +439,7 @@ class O24InputMethodService : InputMethodService(), SharedPreferences.OnSharedPr
                         is GifReply.MissingKey -> {
                             gifEnabled = false
                             boardController?.rebuildToolbar()
-                            showStatus("GIFs need the ${reply.keyName} secret on the server.")
+                            Log.i(TAG, "GIF search hidden. Server secret ${reply.keyName} is not set.")
                         }
                         is GifReply.Failed -> showStatus(reply.message)
                     }
