@@ -56,7 +56,7 @@ data class ThemeColors(
     val micGlow: Int,
     val pressed: Int,
     val cornerDp: Float,
-    val spaceTitle: String = "Otumfour",
+    val spaceTitle: String = "Manhyia",
     val stoneKeys: Boolean = false,
     val stoolOnSpace: Boolean = false,
     val crestRows: Boolean = false,
@@ -97,7 +97,7 @@ private fun modernTheme(id: ThemeId, light: Boolean, photo: String?): ThemeColor
         micGlow = Color.parseColor("#F0C94A"),
         pressed = Color.parseColor(if (night) "#2A3142" else "#F3E2A4"),
         cornerDp = 12f,
-        spaceTitle = "Otumfour",
+        spaceTitle = "Manhyia",
         enterFill = Color.parseColor("#E11D2E"),
         enterLabel = Color.parseColor("#FFFFFF"),
         modern = true,
@@ -248,7 +248,7 @@ private fun themeColors(id: ThemeId): ThemeColors = when (id) {
         micGlow = Color.parseColor("#FFD76A"),
         pressed = Color.parseColor("#5A4818"),
         cornerDp = 12f,
-        spaceTitle = "OTUMFOUR",
+        spaceTitle = "Manhyia",
         enterSolid = true,
     )
     ThemeId.ROYAL_CREST -> ThemeColors(

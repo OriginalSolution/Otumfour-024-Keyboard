@@ -5,14 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.util.Log
 
-/** A supplied photograph, centre-cropped. Soft blurs it and lays a dark scrim over the keys. */
+/** A supplied photograph, centre-cropped, faded lightly so the letters stay clear. */
 object PhotoBackdrop {
     private val cache = HashMap<String, Bitmap>()
     private val softCache = HashMap<String, Bitmap>()
@@ -29,32 +27,20 @@ object PhotoBackdrop {
         fallback: Int = Color.parseColor("#0D1016"),
     ) {
         if (width <= 0 || height <= 0) return
-        if (strength == BackgroundStrength.OFF) {
-            canvas.drawColor(fallback)
-            return
-        }
-        val bitmap = if (BackdropPaint.blur(strength)) softened(context, asset) else bitmap(context, asset)
-        if (bitmap == null) {
-            canvas.drawColor(fallback)
-            return
-        }
+        canvas.drawColor(fallback)
+        if (strength == BackgroundStrength.OFF) return
+        val bitmap = (if (BackdropPaint.blur(strength)) softened(context, asset) else bitmap(context, asset)) ?: return
         val scale = maxOf(width / bitmap.width.toFloat(), height / bitmap.height.toFloat())
         val dw = bitmap.width * scale
         val dh = bitmap.height * scale
         val left = (width - dw) / 2f
         val top = (height - dh) / 2f
+        paint.alpha = BackdropPaint.pictureAlpha(strength)
         canvas.drawBitmap(bitmap, null, RectF(left, top, left + dw, top + dh), paint)
+        paint.alpha = 255
         val alpha = BackdropPaint.scrimAlpha(strength)
-        val topAlpha = (alpha * 0.85f).toInt().coerceIn(0, 255)
-        veilPaint.shader = LinearGradient(
-            0f,
-            0f,
-            0f,
-            height.toFloat(),
-            Color.argb(topAlpha, 7, 8, 12),
-            Color.argb(alpha, 7, 8, 12),
-            Shader.TileMode.CLAMP,
-        )
+        veilPaint.shader = null
+        veilPaint.color = Color.argb(alpha, 7, 8, 12)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), veilPaint)
     }
 
@@ -93,8 +79,8 @@ object PhotoBackdrop {
     private fun softened(context: Context, asset: String): Bitmap? {
         softCache[asset]?.let { if (!it.isRecycled) return it }
         val source = bitmap(context, asset) ?: return null
-        val tinyW = (source.width / 12).coerceAtLeast(8)
-        val tinyH = (source.height / 12).coerceAtLeast(8)
+        val tinyW = (source.width / 4).coerceAtLeast(24)
+        val tinyH = (source.height / 4).coerceAtLeast(24)
         val tiny = Bitmap.createScaledBitmap(source, tinyW, tinyH, true)
         val soft = Bitmap.createScaledBitmap(
             tiny,

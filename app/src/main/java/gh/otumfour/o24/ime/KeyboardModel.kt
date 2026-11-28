@@ -63,7 +63,7 @@ object KeyboardModel {
         language: KeyboardLanguage,
         shift: ShiftState,
         enterLabel: String,
-        spaceLabel: String = "Otumfour",
+        spaceLabel: String = "Manhyia",
     ): List<List<KeySpec>> = when (page) {
         BoardPage.LETTERS -> letters(language, shift, enterLabel, spaceLabel)
         BoardPage.SYMBOLS -> symbols(enterLabel, spaceLabel)
@@ -217,35 +217,4 @@ object KeyboardModel {
         )
     }
 
-    /**
-     * Wide screens: qwert / yuiop, asdfg / hjkl, shift-zxc-v / bnm-delete,
-     * and a space bar on each half.
-     */
-    fun splitRows(rows: List<List<KeySpec>>): Triple<List<List<KeySpec>>, List<List<KeySpec>>, List<List<KeySpec>>>? {
-        fun rowWith(value: String) = rows.firstOrNull { row -> row.any { it.value.equals(value, ignoreCase = true) } }
-        val top = rowWith("q") ?: return null
-        val home = rowWith("a") ?: return null
-        val lower = rowWith("z") ?: return null
-        val actions = rows.firstOrNull { row -> row.any { it.action == KeyAction.SPACE } } ?: return null
-        val extra = rows.filter { it !== top && it !== home && it !== lower && it !== actions }
-        fun splitAt(row: List<KeySpec>, value: String): Pair<List<KeySpec>, List<KeySpec>>? {
-            val index = row.indexOfFirst { it.value.equals(value, ignoreCase = true) }
-            if (index <= 0) return null
-            return row.subList(0, index) to row.subList(index, row.size)
-        }
-        val (leftTop, rightTop) = splitAt(top, "y") ?: return null
-        val (leftHome, rightHome) = splitAt(home, "h") ?: return null
-        val (leftLower, rightLower) = splitAt(lower, "b") ?: return null
-        val spaceAt = actions.indexOfFirst { it.action == KeyAction.SPACE }
-        if (spaceAt < 0) return null
-        val space = actions[spaceAt]
-        val leftActions = actions.subList(0, spaceAt) + space
-        val rightActions = listOf(space) + actions.subList(spaceAt + 1, actions.size)
-        val quote = KeySpec("'", KeyAction.CHAR, "'", weight = 1f, role = KeySpec.Role.ACTION)
-        return Triple(
-            extra,
-            listOf(leftTop, leftHome, leftLower, leftActions),
-            listOf(rightTop, rightHome + quote, rightLower, rightActions),
-        )
-    }
 }
